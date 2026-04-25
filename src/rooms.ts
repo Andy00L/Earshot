@@ -90,6 +90,10 @@ export const ROOM_DEFINITIONS: Record<RoomId, RoomDefinition> = {
       { id: "vent_cub_1", frameName: "vent", x: 600, y: 200, scale: 0.5 },
       { id: "vent_cub_2", frameName: "vent", x: 2400, y: 200, scale: 0.5 },
       { id: "exit_sign_cub", frameName: "exit-sign", x: 3300, y: 350, scale: 0.5, alpha: 0.8 },
+      { id: "radio_table_cub", frameName: "radio-table", x: 1800, y: 866, scale: 0.5 },
+    ],
+    radioPickups: [
+      { radioId: "radio_cub", x: 1800, y: 866, pickupRange: 100 },
     ],
   },
 
@@ -137,6 +141,10 @@ export const ROOM_DEFINITIONS: Record<RoomId, RoomDefinition> = {
       { id: "corpse_server", frameName: "corpse", x: 1500, y: 866, scale: 1.0 },
       { id: "flickerlight_server_1", frameName: "flickerlight", x: 800, y: 250, scale: 0.6, flickerAnimation: true },
       { id: "vent_server", frameName: "vent", x: 2700, y: 200, scale: 0.5 },
+      { id: "radio_table_server", frameName: "radio-table", x: 2200, y: 866, scale: 0.5 },
+    ],
+    radioPickups: [
+      { radioId: "radio_server", x: 2200, y: 866, pickupRange: 100 },
     ],
   },
 

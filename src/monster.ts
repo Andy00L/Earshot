@@ -66,6 +66,10 @@ export class Monster extends Container {
   public state: MonsterState = "PATROL";
   private _suspicion = 0;
 
+  // Lure target (radio bait mechanic)
+  private lureTargetX: number | null = null;
+  private lureExpiresAt: number = 0;
+
   // Sprite and animation
   private sprite: Sprite;
   private manifest: Manifest;
@@ -143,6 +147,24 @@ export class Monster extends Container {
       0,
       this._suspicion - SUSPICION_DECAY_PER_SEC * multiplier * (dtMS / 1000),
     );
+  }
+
+  /** Divert the monster toward a world position for a duration (radio bait). */
+  public startLure(opts: { targetX: number; durationMs: number }): void {
+    this.lureTargetX = opts.targetX;
+    this.lureExpiresAt = performance.now() + opts.durationMs;
+    if (this.state !== "HUNT" && this.state !== "CHARGE") {
+      this.enterState("HUNT", true);
+    }
+  }
+
+  /** Returns lure target if active, otherwise player position. */
+  private getHuntTargetX(): number {
+    if (this.lureTargetX !== null && performance.now() < this.lureExpiresAt) {
+      return this.lureTargetX;
+    }
+    this.lureTargetX = null;
+    return this.playerRef.x;
   }
 
   public onStateChange: ((state: MonsterState) => void) | null = null;
@@ -277,14 +299,15 @@ export class Monster extends Container {
   }
 
   private updateHunt(dt: number): void {
-    // Suspicion frozen. Check if lost track.
-    if (this._suspicion < SUSPICION_LOST) {
+    // Suspicion frozen. Check if lost track (skip if lure active).
+    if (this._suspicion < SUSPICION_LOST && this.lureTargetX === null) {
       this.enterState("PATROL");
       return;
     }
 
-    // Move toward player
-    const dx = this.playerRef.x - this.x;
+    // Move toward hunt target (player or lure)
+    const targetX = this.getHuntTargetX();
+    const dx = targetX - this.x;
     this.facing = dx > 0 ? 1 : -1;
     this.x += this.facing * HUNT_SPEED * dt;
 
@@ -295,7 +318,8 @@ export class Monster extends Container {
   }
 
   private updateCharge(dt: number): void {
-    const dx = this.playerRef.x - this.x;
+    const targetX = this.getHuntTargetX();
+    const dx = targetX - this.x;
     this.facing = dx > 0 ? 1 : -1;
     this.x += this.facing * CHARGE_SPEED * dt;
 

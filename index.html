@@ -8,9 +8,145 @@
     html, body { margin: 0; padding: 0; background: #0a0806; overflow: hidden; height: 100%; }
     body { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
     canvas { display: block; image-rendering: -webkit-optimize-contrast; }
+
+    /* Radio ARM popup overlay */
+    #radio-popup {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      font-family: 'Courier New', monospace;
+      color: #d4d4d4;
+    }
+    #radio-popup.radio-popup-hidden { display: none; }
+    .radio-popup-content {
+      background: #1a1a1a;
+      border: 2px solid #555;
+      padding: 32px;
+      width: 480px;
+      max-width: 90vw;
+      box-shadow: 0 0 60px rgba(255, 60, 60, 0.4);
+    }
+    .radio-popup-content h2 {
+      margin: 0 0 8px 0;
+      font-size: 24px;
+      color: #ff6060;
+      letter-spacing: 4px;
+    }
+    .radio-hint {
+      font-size: 13px;
+      color: #888;
+      margin-bottom: 20px;
+    }
+    #radio-message-input {
+      width: 100%;
+      padding: 12px;
+      background: #0a0a0a;
+      border: 1px solid #555;
+      color: #fff;
+      font-family: inherit;
+      font-size: 16px;
+      box-sizing: border-box;
+    }
+    #radio-message-input:focus {
+      outline: none;
+      border-color: #ff6060;
+    }
+    .radio-char-count {
+      text-align: right;
+      font-size: 11px;
+      color: #666;
+      margin-top: 4px;
+    }
+    .radio-presets {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      margin: 16px 0;
+    }
+    .radio-preset-btn {
+      padding: 8px;
+      background: #2a2a2a;
+      border: 1px solid #444;
+      color: #d4d4d4;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 12px;
+      letter-spacing: 1px;
+    }
+    .radio-preset-btn:hover { background: #3a3a3a; }
+    .radio-timer-section { margin: 16px 0; }
+    .radio-timer-section label {
+      display: block;
+      font-size: 13px;
+      margin-bottom: 8px;
+    }
+    #radio-timer { width: 100%; }
+    .radio-actions {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 24px;
+    }
+    .radio-btn-cancel {
+      padding: 10px 24px;
+      background: transparent;
+      border: 1px solid #666;
+      color: #aaa;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .radio-btn-arm {
+      padding: 10px 24px;
+      background: #aa3333;
+      border: 1px solid #ff6060;
+      color: #fff;
+      cursor: pointer;
+      font-family: inherit;
+      font-weight: bold;
+      letter-spacing: 2px;
+    }
+    .radio-btn-arm:disabled {
+      background: #333;
+      border-color: #444;
+      color: #666;
+      cursor: not-allowed;
+    }
   </style>
 </head>
 <body>
+  <!-- Radio ARM popup (HTML overlay, shown over PIXI canvas during PAUSED phase) -->
+  <div id="radio-popup" class="radio-popup-hidden">
+    <div class="radio-popup-content">
+      <h2>ARM RADIO</h2>
+      <p class="radio-hint">Type a message. The radio will broadcast it after the timer.</p>
+      <input
+        type="text"
+        id="radio-message-input"
+        maxlength="30"
+        placeholder="Type message (max 30 chars)..."
+        autocomplete="off"
+      />
+      <div class="radio-char-count"><span id="radio-char-count">0</span> / 30</div>
+      <div class="radio-presets">
+        <button class="radio-preset-btn" data-preset="HELP ME">HELP ME</button>
+        <button class="radio-preset-btn" data-preset="OVER HERE">OVER HERE</button>
+        <button class="radio-preset-btn" data-preset="AAAAH">AAAAH</button>
+        <button class="radio-preset-btn" data-preset="STAY BACK">STAY BACK</button>
+      </div>
+      <div class="radio-timer-section">
+        <label for="radio-timer">Timer: <span id="radio-timer-value">4</span>s</label>
+        <input type="range" id="radio-timer" min="3" max="5" step="1" value="4" />
+      </div>
+      <div class="radio-actions">
+        <button id="radio-cancel-btn" class="radio-btn-cancel">CANCEL (Esc)</button>
+        <button id="radio-arm-btn" class="radio-btn-arm" disabled>ARM</button>
+      </div>
+    </div>
+  </div>
+
   <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

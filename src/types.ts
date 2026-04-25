@@ -14,7 +14,7 @@ export type RoomId = "reception" | "cubicles" | "server" | "stairwell";
 export type PickupId = "keycard" | "breaker_switch";
 
 // Game phases. Drives main loop branching.
-export type GamePhase = "PLAYING" | "DYING" | "GAMEOVER" | "WIN";
+export type GamePhase = "PLAYING" | "PAUSED" | "DYING" | "GAMEOVER" | "WIN";
 
 // Door unlock requirements.
 export type DoorRequirement = "none" | "press_e" | "keycard" | "breaker_on";
@@ -52,6 +52,7 @@ export interface GameState {
   breakerOn: boolean;
   hasShownReceptionTutorial: boolean;
   hidingState: HidingState;
+  radio: RadioState;
 }
 
 export function createInitialGameState(): GameState {
@@ -62,7 +63,56 @@ export function createInitialGameState(): GameState {
     breakerOn: false,
     hasShownReceptionTutorial: false,
     hidingState: { active: false, spotId: null, kind: null },
+    radio: {
+      carriedRadioId: null,
+      armedRadios: [],
+      collectedRadioIds: new Set(),
+      droppedRadios: [],
+      spentRadios: [],
+    },
   };
+}
+
+// Radio pickup definition (separate from regular pickups)
+export interface RadioPickupDef {
+  radioId: string;
+  x: number;
+  y: number;
+  pickupRange: number;
+}
+
+// Radio bait state
+export interface ArmedRadio {
+  id: string;
+  message: string;
+  timerMs: number;
+  remainingMs: number;
+  ttsState: "loading" | "ready" | "failed";
+  ttsBlobUrl: string | null;
+  position: { x: number; y: number };
+  thrown: boolean;
+  velocity: { x: number; y: number };
+  roomId: RoomId;
+}
+
+export interface DroppedRadio {
+  radioId: string;
+  roomId: RoomId;
+  x: number;
+}
+
+export interface SpentRadio {
+  roomId: RoomId;
+  x: number;
+  y: number;
+}
+
+export interface RadioState {
+  carriedRadioId: string | null;
+  armedRadios: ArmedRadio[];
+  collectedRadioIds: Set<string>;
+  droppedRadios: DroppedRadio[];
+  spentRadios: SpentRadio[];
 }
 
 // Hiding spot types
@@ -99,4 +149,5 @@ export interface RoomDefinition {
   doors: DoorConfig[];
   hidingSpots?: HidingSpotDef[];
   decorativeProps?: DecorativePropDef[];
+  radioPickups?: RadioPickupDef[];
 }

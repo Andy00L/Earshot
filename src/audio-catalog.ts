@@ -26,7 +26,9 @@ export type SfxId =
   | "locker_close"
   | "locker_open"
   | "locker_door_creak"
-  | "desk_crouch";
+  | "desk_crouch"
+  | "static_burst"
+  | "radio_throw";
 
 export type RadioVoiceId =
   | "radio_intro"
@@ -245,6 +247,26 @@ export const AUDIO_CATALOG: Record<AudioId, AudioAsset> = {
     durationSec: 1,
     loop: false,
     volume: 0.4,
+  },
+
+  // RADIO BAIT SFX
+  static_burst: {
+    id: "static_burst",
+    category: "sfx",
+    prompt: "Harsh radio static burst with brief feedback squeal. About 1.5 seconds.",
+    durationSec: 2,
+    loop: false,
+    volume: 0.9,
+    // TODO: source this asset before demo. ~1-2s of harsh radio static.
+    // Used as fallback when TTS API fails or times out.
+  },
+  radio_throw: {
+    id: "radio_throw",
+    category: "sfx",
+    prompt: "Small object tossed through the air and landing with a clatter. About 0.6 seconds.",
+    durationSec: 1,
+    loop: false,
+    volume: 0.5,
   },
 
   // RADIO OPERATOR VOICE (TTS)

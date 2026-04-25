@@ -8,6 +8,9 @@ export class HUD {
   private promptBox: Container | null = null;
   private currentPromptStr: string = "";
   private hiddenIndicator: Container | null = null;
+  private radioIndicator: Container | null = null;
+  private radioTimerBox: Container | null = null;
+  private radioTimerText: Text | null = null;
 
   constructor(parent: Container) {
     this.container = new Container();
@@ -159,6 +162,68 @@ export class HUD {
     }
   }
 
+  showRadioInventory(carrying: boolean): void {
+    if (carrying && !this.radioIndicator) {
+      const box = new Container();
+      const label = new Text({
+        text: "RADIO [R]",
+        style: { fontFamily: "monospace", fontSize: 14, fill: 0xffaa44 },
+      });
+      const bg = new Graphics();
+      bg.roundRect(0, 0, label.width + 16, label.height + 8, 4);
+      bg.fill({ color: 0x000000, alpha: 0.6 });
+      box.addChild(bg);
+      label.x = 8;
+      label.y = 4;
+      box.addChild(label);
+      box.x = 16;
+      box.y = 10;
+      this.container.addChild(box);
+      this.radioIndicator = box;
+    } else if (!carrying && this.radioIndicator) {
+      this.container.removeChild(this.radioIndicator);
+      this.radioIndicator.destroy({ children: true });
+      this.radioIndicator = null;
+    }
+  }
+
+  showRadioTimer(remainingMs: number, thrown: boolean): void {
+    const sec = Math.max(0, remainingMs / 1000).toFixed(1);
+    const throwHint = thrown ? "" : "  [G] throw";
+    const display = `ARMED: ${sec}s${throwHint}`;
+
+    if (!this.radioTimerBox) {
+      const box = new Container();
+      const label = new Text({
+        text: display,
+        style: { fontFamily: "monospace", fontSize: 16, fill: 0xff4444 },
+      });
+      const bg = new Graphics();
+      bg.roundRect(0, 0, 260, label.height + 12, 4);
+      bg.fill({ color: 0x000000, alpha: 0.7 });
+      box.addChild(bg);
+      label.x = 8;
+      label.y = 6;
+      box.addChild(label);
+      box.x = 640 - 130;
+      box.y = 40;
+      this.container.addChild(box);
+      this.radioTimerBox = box;
+      this.radioTimerText = label;
+    } else if (this.radioTimerText) {
+      this.radioTimerText.text = display;
+    }
+  }
+
+  clearRadioTimer(): void {
+    if (this.radioTimerBox) {
+      this.container.removeChild(this.radioTimerBox);
+      this.radioTimerBox.destroy({ children: true });
+      this.radioTimerBox = null;
+      this.radioTimerText = null;
+    }
+  }
+
   private clearMessage(): void {
     if (this.msgBox) {
       this.container.removeChild(this.msgBox);
@@ -171,6 +236,8 @@ export class HUD {
     this.clearMessage();
     this.clearPrompt();
     this.setHiddenVisible(false);
+    this.showRadioInventory(false);
+    this.clearRadioTimer();
     if (this.suspicionBar) {
       this.suspicionBar.destroy();
       this.suspicionBar = null;

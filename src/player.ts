@@ -56,6 +56,10 @@ export class Player extends Container {
     return this.currentState;
   }
 
+  get facingDirection(): 1 | -1 {
+    return this.facing;
+  }
+
   setRoomWidth(width: number) {
     this.roomWidth = width;
   }

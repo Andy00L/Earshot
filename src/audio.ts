@@ -116,6 +116,25 @@ export class AudioManager {
     }
   }
 
+  /** Load and play audio from a blob URL (used for runtime TTS). */
+  loadAndPlayBlob(id: string, blobUrl: string, opts?: { volume?: number }): void {
+    const howl = new Howl({
+      src: [blobUrl],
+      format: ["mp3"],
+      volume: (opts?.volume ?? 1.0) * this.masterVolume,
+      onend: () => {
+        howl.unload();
+        URL.revokeObjectURL(blobUrl);
+      },
+      onloaderror: () => {
+        console.warn(`[radio] Failed to decode TTS blob ${id}, cleaning up`);
+        howl.unload();
+        URL.revokeObjectURL(blobUrl);
+      },
+    });
+    howl.play();
+  }
+
   setMasterVolume(v: number): void {
     this.masterVolume = Math.max(0, Math.min(1, v));
     Howler.volume(this.masterVolume);

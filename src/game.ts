@@ -14,6 +14,8 @@ import {
   createInitialGameState,
   RoomId,
   MonsterState,
+  ArmedRadio,
+  RadioPickupDef,
 } from "./types";
 import { Manifest } from "./assets";
 import { Player } from "./player";
@@ -29,6 +31,8 @@ import { micAnalyser } from "./mic";
 import { suspicionDeltaForFrame } from "./suspicion";
 import { Flashlight } from "./flashlight";
 import { AmbientId } from "./audio-catalog";
+import { RadioPopup } from "./radio-popup";
+import { synthesizeTTS } from "./tts";
 
 // Survives Game restart (audio stays loaded, mic stays active)
 let audioInitialized = false;
@@ -49,6 +53,13 @@ export class Game {
   private decorativeSprites: Sprite[] = [];
   private flickerTimers: { sprite: Sprite; timer: number; nextAt: number }[] = [];
   private flashlight: Flashlight | null = null;
+
+  // Radio bait system
+  private radioPopup: RadioPopup;
+  private armedRadioSprites: Map<string, Sprite> = new Map();
+  private droppedRadioSprites: Map<string, Sprite> = new Map();
+  private spentRadioSprites: Map<string, Sprite> = new Map();
+  private armedRadioAborts: Map<string, AbortController> = new Map();
 
   // Desk-hide charge roll state (reset when monster leaves CHARGE or player exits hide)
   private deskChargeRolled = false;
@@ -75,6 +86,7 @@ export class Game {
     this.app = app;
     this.manifest = manifest;
     this.state = createInitialGameState();
+    this.radioPopup = new RadioPopup();
   }
 
   async start(): Promise<void> {
@@ -102,6 +114,7 @@ export class Game {
     // Create room-specific props for reception
     this.createDecorativeProps();
     this.createHidingSpots();
+    this.createRadioWorldSprites();
 
     // Lock gameplay until audio loaded and user clicks
     this.locked = true;
@@ -235,6 +248,10 @@ export class Game {
         this.handlePlayingTick(dt, dtMS);
         break;
 
+      case "PAUSED":
+        // Ticker should be stopped during PAUSED, but guard anyway
+        break;
+
       case "DYING":
         if (this.player.caughtComplete && !this.locked) {
           this.showGameover();
@@ -275,7 +292,17 @@ export class Game {
       this.monster.addSuspicion(delta);
     }
 
-    // Hiding prompts and movement-exit
+    // Radio: arm (R key) and throw (G key)
+    if (this.input.justArmedRadio()) {
+      this.armCarriedRadio();
+    }
+    if (this.input.justThrew()) {
+      this.throwCarriedArmedRadio();
+    }
+    this.updateArmedRadios(dtMS);
+    this.syncArmedRadioSprites();
+
+    // Hiding prompts and movement-exit (also shows radio pickup prompts)
     this.updateHidingPrompts();
 
     this.handleInteraction();
@@ -302,6 +329,17 @@ export class Game {
 
     // Suspicion meter
     this.hud.updateSuspicionMeter(this.monster?.suspicion ?? 0);
+
+    // Radio HUD
+    this.hud.showRadioInventory(this.state.radio.carriedRadioId !== null);
+    const activeArmed = this.state.radio.armedRadios.find(
+      (r) => r.roomId === this.state.currentRoom && r.remainingMs > 0,
+    );
+    if (activeArmed) {
+      this.hud.showRadioTimer(activeArmed.remainingMs, activeArmed.thrown);
+    } else {
+      this.hud.clearRadioTimer();
+    }
   }
 
   // ── Footstep SFX ──
@@ -364,6 +402,13 @@ export class Game {
     const nearestSpot = this.getNearestHidingSpot();
     if (nearestSpot) {
       this.enterHide(nearestSpot);
+      return;
+    }
+
+    // Radio pickup (before regular pickups)
+    const nearbyRadio = this.getNearbyRadioPickup();
+    if (nearbyRadio) {
+      this.pickUpRadio(nearbyRadio);
       return;
     }
 
@@ -537,6 +582,7 @@ export class Game {
       this.createMonster();
       this.createDecorativeProps();
       this.createHidingSpots();
+      this.createRadioWorldSprites();
 
       // Crossfade ambient to new room
       const ambientId = `${toRoom}_ambient` as AmbientId;
@@ -577,6 +623,9 @@ export class Game {
     if (this.flashlight) this.flashlight.setHidingMode("none");
     this.hud.clearPrompt();
     this.hud.setHiddenVisible(false);
+
+    // Clean up radio sprites (armed, dropped, spent) for old room
+    this.destroyRadioSprites();
   }
 
   private createPickups(): void {
@@ -646,6 +695,15 @@ export class Game {
     this.player.startCaughtSequence();
     audioManager.stopAllMonsterVocals();
     audioManager.playOneShot("death_thud");
+
+    // Cancel any pending TTS calls
+    for (const [id, ctrl] of this.armedRadioAborts) {
+      ctrl.abort();
+    }
+    this.armedRadioAborts.clear();
+    this.state.radio.armedRadios = [];
+    this.hud.clearRadioTimer();
+    this.hud.showRadioInventory(false);
   }
 
   private async showGameover(): Promise<void> {
@@ -754,6 +812,15 @@ export class Game {
     audioManager.stopAllMonsterVocals();
     audioManager.fadeOutAmbient(100);
 
+    // Cancel pending TTS calls
+    for (const [, ctrl] of this.armedRadioAborts) {
+      ctrl.abort();
+    }
+    this.armedRadioAborts.clear();
+
+    // Clean up radio popup
+    this.radioPopup.destroy();
+
     // Clean up HUD (lives on stage, not world)
     this.hud.destroy();
 
@@ -788,7 +855,12 @@ export class Game {
           nearestSpot.kind === "locker" ? "in locker" : "under desk";
         this.hud.showPrompt(`Press E to hide ${label}`);
       } else {
-        this.hud.clearPrompt();
+        const nearbyRadio = this.getNearbyRadioPickup();
+        if (nearbyRadio) {
+          this.hud.showPrompt("Press E to take radio");
+        } else {
+          this.hud.clearPrompt();
+        }
       }
     }
   }
@@ -898,6 +970,351 @@ export class Game {
       this.world.addChild(spot.sprite);
       this.hidingSpots.push(spot);
     }
+  }
+
+  // ── Radio bait system ──
+
+  private getNearbyRadioPickup(): RadioPickupDef | null {
+    const def = this.rooms.currentDef;
+    if (!def.radioPickups) return null;
+    for (const rp of def.radioPickups) {
+      // Skip collected originals
+      if (this.state.radio.collectedRadioIds.has(rp.radioId)) continue;
+      if (Math.abs(this.player.x - rp.x) <= rp.pickupRange) return rp;
+    }
+    // Check dropped radios in this room
+    for (const dr of this.state.radio.droppedRadios) {
+      if (dr.roomId !== this.state.currentRoom) continue;
+      if (Math.abs(this.player.x - dr.x) <= 100) {
+        return { radioId: dr.radioId, x: dr.x, y: 0, pickupRange: 100 };
+      }
+    }
+    return null;
+  }
+
+  private pickUpRadio(rpDef: RadioPickupDef): void {
+    // If already carrying a radio, drop it at current position
+    if (this.state.radio.carriedRadioId !== null) {
+      const oldId = this.state.radio.carriedRadioId;
+      // Remove from droppedRadios if it was a dropped one
+      this.state.radio.droppedRadios = this.state.radio.droppedRadios.filter(
+        (d) => d.radioId !== oldId,
+      );
+      // Add old radio as dropped
+      this.state.radio.droppedRadios.push({
+        radioId: oldId,
+        roomId: this.state.currentRoom,
+        x: this.player.x,
+      });
+      // Create dropped sprite
+      this.createDroppedRadioSprite(oldId, this.player.x);
+    }
+
+    // Pick up the new radio
+    this.state.radio.carriedRadioId = rpDef.radioId;
+    this.state.radio.collectedRadioIds.add(rpDef.radioId);
+
+    // Remove from droppedRadios if picking up a dropped one
+    this.state.radio.droppedRadios = this.state.radio.droppedRadios.filter(
+      (d) => d.radioId !== rpDef.radioId,
+    );
+    // Remove dropped sprite if exists
+    const droppedSprite = this.droppedRadioSprites.get(rpDef.radioId);
+    if (droppedSprite) {
+      this.world.removeChild(droppedSprite);
+      droppedSprite.destroy();
+      this.droppedRadioSprites.delete(rpDef.radioId);
+    }
+
+    this.hud.showMessage("Radio acquired. Press R to arm.", 3000);
+    audioManager.playOneShot("keycard_pickup");
+  }
+
+  private async armCarriedRadio(): Promise<void> {
+    if (this.state.phase !== "PLAYING") return;
+    if (this.state.radio.carriedRadioId === null) return;
+    if (this.state.hidingState.active) return;
+
+    // Pause game
+    this.state.phase = "PAUSED";
+    this.app.ticker.stop();
+
+    const result = await this.radioPopup.show();
+
+    // Clear input state accumulated during popup
+    this.input.clearAll();
+
+    if (result === null) {
+      // Cancelled: resume, radio still in inventory
+      this.state.phase = "PLAYING";
+      this.app.ticker.start();
+      return;
+    }
+
+    // Commit arm
+    const armedId = `armed_${Date.now()}`;
+    const floorY = this.rooms.currentRoom.floorY;
+    const armed: ArmedRadio = {
+      id: armedId,
+      message: result.message,
+      timerMs: result.timerSec * 1000,
+      remainingMs: result.timerSec * 1000,
+      ttsState: "loading",
+      ttsBlobUrl: null,
+      position: { x: this.player.x, y: floorY },
+      thrown: false,
+      velocity: { x: 0, y: 0 },
+      roomId: this.state.currentRoom,
+    };
+    this.state.radio.armedRadios.push(armed);
+    this.state.radio.carriedRadioId = null;
+
+    // Resume game
+    this.state.phase = "PLAYING";
+    this.app.ticker.start();
+
+    // Fire TTS request (async, non-blocking)
+    const abortCtrl = new AbortController();
+    this.armedRadioAborts.set(armedId, abortCtrl);
+    synthesizeTTS(result.message, abortCtrl.signal)
+      .then((tts) => {
+        armed.ttsState = "ready";
+        armed.ttsBlobUrl = tts.blobUrl;
+      })
+      .catch((err) => {
+        if (err.name !== "AbortError") {
+          console.warn(
+            `[radio] TTS failed for ${armedId}, using fallback:`,
+            err.message,
+          );
+        }
+        armed.ttsState = "failed";
+      });
+  }
+
+  private throwCarriedArmedRadio(): void {
+    if (this.state.phase !== "PLAYING") return;
+    // Find the most recent armed radio in player's hand (not yet thrown)
+    const armed = this.state.radio.armedRadios.find(
+      (r) => !r.thrown && r.roomId === this.state.currentRoom,
+    );
+    if (!armed) return;
+
+    armed.thrown = true;
+    const dir = this.player.facingDirection;
+    armed.velocity.x = dir * 600;
+    armed.velocity.y = -500;
+    if (audioManager.has("radio_throw")) {
+      audioManager.playOneShot("radio_throw");
+    }
+  }
+
+  private updateArmedRadios(dtMS: number): void {
+    const floorY = this.rooms.currentRoom.floorY;
+
+    for (const armed of this.state.radio.armedRadios) {
+      if (armed.remainingMs <= 0) continue;
+
+      armed.remainingMs -= dtMS;
+
+      if (armed.thrown) {
+        // Parabolic motion
+        const dtSec = dtMS / 1000;
+        armed.position.x += armed.velocity.x * dtSec;
+        armed.position.y += armed.velocity.y * dtSec;
+        armed.velocity.y += 1500 * dtSec; // gravity
+        // Floor clamp
+        if (armed.position.y > floorY) {
+          armed.position.y = floorY;
+          armed.velocity.x = 0;
+          armed.velocity.y = 0;
+        }
+      } else {
+        // In hand: track player
+        armed.position.x = this.player.x;
+        armed.position.y = floorY;
+      }
+
+      if (armed.remainingMs <= 0) {
+        this.detonateArmedRadio(armed);
+      }
+    }
+
+    // Remove fully detonated radios from active list
+    this.state.radio.armedRadios = this.state.radio.armedRadios.filter(
+      (r) => r.remainingMs > 0,
+    );
+  }
+
+  private detonateArmedRadio(armed: ArmedRadio): void {
+    // Cancel any pending TTS request
+    const abortCtrl = this.armedRadioAborts.get(armed.id);
+    if (abortCtrl) {
+      abortCtrl.abort();
+      this.armedRadioAborts.delete(armed.id);
+    }
+
+    // Skip audio if player is dead
+    if (this.state.phase === "DYING" || this.state.phase === "GAMEOVER") return;
+
+    // Play audio: TTS if ready, else fallback
+    if (armed.ttsState === "ready" && armed.ttsBlobUrl) {
+      audioManager.loadAndPlayBlob(`tts_${armed.id}`, armed.ttsBlobUrl, {
+        volume: 1.0,
+      });
+    } else {
+      if (audioManager.has("static_burst")) {
+        audioManager.playOneShot("static_burst");
+      }
+    }
+
+    if (armed.thrown) {
+      // Lure: divert monster toward radio position for 5 seconds
+      if (this.monster && armed.roomId === this.state.currentRoom) {
+        this.monster.startLure({
+          targetX: armed.position.x,
+          durationMs: 5000,
+        });
+        this.monster.addSuspicion(40);
+      }
+      // Mark as spent radio (visual floor prop)
+      this.state.radio.spentRadios.push({
+        roomId: armed.roomId,
+        x: armed.position.x,
+        y: armed.position.y,
+      });
+    } else {
+      // Exploded in hand: massive suspicion + screen flash
+      if (this.monster) {
+        this.monster.addSuspicion(50);
+      }
+      this.hud.showMessage("RADIO MALFUNCTIONED", 1500);
+      this.flashScreen(0xff0000, 0.4);
+    }
+  }
+
+  private flashScreen(color: number, peakAlpha: number): void {
+    const overlay = new Graphics();
+    overlay.rect(0, 0, this.app.screen.width, this.app.screen.height);
+    overlay.fill({ color, alpha: peakAlpha });
+    overlay.zIndex = 9000;
+    this.app.stage.addChild(overlay);
+
+    let elapsed = 0;
+    const duration = 400;
+    const handler = (tk: Ticker) => {
+      elapsed += tk.deltaMS;
+      const t = Math.min(elapsed / duration, 1);
+      overlay.alpha = peakAlpha * (1 - t);
+      if (t >= 1) {
+        this.app.ticker.remove(handler);
+        this.app.stage.removeChild(overlay);
+        overlay.destroy();
+      }
+    };
+    this.app.ticker.add(handler);
+  }
+
+  private syncArmedRadioSprites(): void {
+    const radioTexture = Assets.get<Texture>("radio");
+
+    for (const armed of this.state.radio.armedRadios) {
+      if (armed.roomId !== this.state.currentRoom) continue;
+
+      let sprite = this.armedRadioSprites.get(armed.id);
+      if (!sprite) {
+        sprite = new Sprite(radioTexture || Texture.WHITE);
+        sprite.anchor.set(0.5, 1.0);
+        sprite.scale.set(0.08);
+        this.world.addChild(sprite);
+        this.armedRadioSprites.set(armed.id, sprite);
+      }
+      sprite.x = armed.position.x;
+      sprite.y = armed.position.y;
+
+      // Pulsing red tint
+      const pulse = Math.sin(performance.now() / 100) * 0.5 + 0.5;
+      const r = 0xff;
+      const g = Math.floor(pulse * 0x40);
+      const b = Math.floor(pulse * 0x40);
+      sprite.tint = (r << 16) | (g << 8) | b;
+    }
+
+    // Remove sprites for detonated or out-of-room radios
+    const activeIds = new Set(
+      this.state.radio.armedRadios
+        .filter((r) => r.roomId === this.state.currentRoom)
+        .map((r) => r.id),
+    );
+    for (const [id, sprite] of this.armedRadioSprites) {
+      if (!activeIds.has(id)) {
+        this.world.removeChild(sprite);
+        sprite.destroy();
+        this.armedRadioSprites.delete(id);
+      }
+    }
+  }
+
+  private createDroppedRadioSprite(radioId: string, x: number): void {
+    const radioTexture = Assets.get<Texture>("radio");
+    const sprite = new Sprite(radioTexture || Texture.WHITE);
+    sprite.anchor.set(0.5, 1.0);
+    sprite.scale.set(0.08);
+    sprite.x = x;
+    sprite.y = this.rooms.currentRoom.floorY;
+    sprite.tint = 0xaaaaaa;
+    this.world.addChild(sprite);
+    this.droppedRadioSprites.set(radioId, sprite);
+  }
+
+  private createRadioWorldSprites(): void {
+    const floorY = this.rooms.currentRoom.floorY;
+    const radioTexture = Assets.get<Texture>("radio");
+
+    // Dropped radios in this room
+    for (const dr of this.state.radio.droppedRadios) {
+      if (dr.roomId !== this.state.currentRoom) continue;
+      const sprite = new Sprite(radioTexture || Texture.WHITE);
+      sprite.anchor.set(0.5, 1.0);
+      sprite.scale.set(0.08);
+      sprite.x = dr.x;
+      sprite.y = floorY;
+      sprite.tint = 0xaaaaaa;
+      this.world.addChild(sprite);
+      this.droppedRadioSprites.set(dr.radioId, sprite);
+    }
+
+    // Spent radios in this room (visual only, non-interactive)
+    for (const sr of this.state.radio.spentRadios) {
+      if (sr.roomId !== this.state.currentRoom) continue;
+      const sprite = new Sprite(radioTexture || Texture.WHITE);
+      sprite.anchor.set(0.5, 1.0);
+      sprite.scale.set(0.08);
+      sprite.x = sr.x;
+      sprite.y = sr.y;
+      sprite.tint = 0x444444;
+      sprite.alpha = 0.6;
+      this.world.addChild(sprite);
+      this.spentRadioSprites.set(`spent_${sr.x}`, sprite);
+    }
+  }
+
+  private destroyRadioSprites(): void {
+    for (const [, sprite] of this.armedRadioSprites) {
+      this.world.removeChild(sprite);
+      sprite.destroy();
+    }
+    this.armedRadioSprites.clear();
+    for (const [, sprite] of this.droppedRadioSprites) {
+      this.world.removeChild(sprite);
+      sprite.destroy();
+    }
+    this.droppedRadioSprites.clear();
+    for (const [, sprite] of this.spentRadioSprites) {
+      this.world.removeChild(sprite);
+      sprite.destroy();
+    }
+    this.spentRadioSprites.clear();
   }
 
   // ── Camera ──

@@ -61,6 +61,23 @@ export class Input {
     return this.justPressed("KeyE") || this.justPressed("ArrowUp");
   }
 
+  /** Returns true on the single frame R was first pressed (arm radio). */
+  justArmedRadio(): boolean {
+    return this.justPressed("KeyR");
+  }
+
+  /** Returns true on the single frame G was first pressed (throw radio). */
+  justThrew(): boolean {
+    return this.justPressed("KeyG");
+  }
+
+  /** Clear all held/pressed state (used after resuming from PAUSED). */
+  clearAll(): void {
+    this.held.clear();
+    this.codesHeld.clear();
+    this.codesPressedThisFrame.clear();
+  }
+
   /** Call at the end of every game tick to clear edge-triggered state. */
   endFrame(): void {
     this.codesPressedThisFrame.clear();
