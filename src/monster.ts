@@ -93,8 +93,6 @@ export class Monster extends Container {
   // Room bounds
   private roomLeft = 60;
   private roomRight = 3000;
-  private _diagSuspCallCount = 0;
-  private _diagDecayFrame = 0;
 
   constructor(
     manifest: Manifest,
@@ -104,14 +102,6 @@ export class Monster extends Container {
     roomWidth: number,
   ) {
     super();
-
-    if (import.meta.env.DEV) {
-      console.log(
-        `[ref] Monster constructed. ` +
-        `playerRefProvided=${playerRef !== null && playerRef !== undefined} ` +
-        `playerRefX=${playerRef?.x ?? "n/a"}`
-      );
-    }
 
     this.manifest = manifest;
     this.patrolPath = patrolPath;
@@ -138,27 +128,7 @@ export class Monster extends Container {
   }
 
   addSuspicion(amount: number): void {
-    if (import.meta.env.DEV) {
-      this._diagSuspCallCount++;
-      if (this._diagSuspCallCount % 60 === 0) {
-        console.log(
-          `[monster-susp] addSuspicion(${amount.toFixed(4)}). ` +
-          `before=${this._suspicion.toFixed(1)} ` +
-          `state=${this.state} ` +
-          `callCount=${this._diagSuspCallCount}`
-        );
-      }
-    }
-
     this._suspicion = Math.min(SUSPICION_MAX, Math.max(0, this._suspicion + amount));
-
-    if (import.meta.env.DEV && this._diagSuspCallCount % 60 === 0) {
-      console.log(
-        `[monster-susp] after add. ` +
-        `after=${this._suspicion.toFixed(1)} ` +
-        `delta=${amount.toFixed(4)}`
-      );
-    }
   }
 
   public onStateChange: ((state: MonsterState) => void) | null = null;
@@ -196,23 +166,7 @@ export class Monster extends Container {
     const inSet = CATCH_STATES.includes(this.state);
     const px = this.playerRef.x;
     const dx = Math.abs(this.x - px);
-    const distOk = dx <= CATCH_DIST;
-    const pass = inSet && distOk;
-
-    // TEMP DIAGNOSTIC (augmented). Remove after verifying catch works.
-    if (import.meta.env.DEV) {
-      if (dx < 200) {
-        console.log(
-          `[catch] state=${this.state} ` +
-          `M=(${this.x.toFixed(0)}) ` +
-          `P=(${px.toFixed(0)}) ` +
-          `dx=${dx.toFixed(0)} ` +
-          `inSet=${inSet} distOk=${distOk} pass=${pass} ` +
-          `playerRefAlive=${this.playerRef !== null && this.playerRef !== undefined}`
-        );
-      }
-    }
-    return pass;
+    return inSet && dx <= CATCH_DIST;
   }
 
   // ── State enter ──
@@ -230,13 +184,6 @@ export class Monster extends Container {
     }
 
     const prevState = this.state;
-
-    if (import.meta.env.DEV && newState !== prevState) {
-      console.log(
-        `[state-trans] ${prevState} -> ${newState}. ` +
-        `suspicion=${this._suspicion.toFixed(1)}`
-      );
-    }
 
     this.state = newState;
     this.stateTimer = 0;
@@ -262,17 +209,6 @@ export class Monster extends Container {
       0,
       this._suspicion - (SUSPICION_DECAY_PER_SEC * dtMS) / 1000,
     );
-
-    if (import.meta.env.DEV) {
-      this._diagDecayFrame++;
-      if (this._diagDecayFrame % 60 === 0) {
-        console.log(
-          `[susp] PATROL decay. ` +
-          `suspicion=${this._suspicion.toFixed(1)} ` +
-          `decayPerFrame=${((SUSPICION_DECAY_PER_SEC * dtMS) / 1000).toFixed(3)}`
-        );
-      }
-    }
 
     // Check alert threshold
     if (this._suspicion >= SUSPICION_ALERT) {

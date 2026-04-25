@@ -19,11 +19,7 @@ export class MicAnalyser {
    * (click handler) per browser autoplay policy.
    */
   async start(): Promise<void> {
-    if (import.meta.env.DEV) console.log("[mic] start() called. current state=" + this.state);
-    if (this.state === "active" || this.state === "requesting") {
-      if (import.meta.env.DEV) console.log("[mic] start() returned early, already " + this.state);
-      return;
-    }
+    if (this.state === "active" || this.state === "requesting") return;
     this.state = "requesting";
 
     try {
@@ -38,15 +34,12 @@ export class MicAnalyser {
       if (err.name === "NotAllowedError") {
         this.state = "denied";
         this.lastErrorMessage = "Microphone permission denied. Suspicion will stay at 0.";
-        if (import.meta.env.DEV) console.log("[mic] DENIED by user");
       } else if (err.name === "NotFoundError" || err.name === "OverconstrainedError") {
         this.state = "no_device";
         this.lastErrorMessage = "No microphone found. Demo mode active.";
-        if (import.meta.env.DEV) console.log("[mic] no device available");
       } else {
         this.state = "error";
         this.lastErrorMessage = `Mic error: ${err.message}`;
-        if (import.meta.env.DEV) console.log("[mic] ERROR: " + (err.message || err));
       }
       console.warn(this.lastErrorMessage);
       return;
@@ -66,7 +59,6 @@ export class MicAnalyser {
 
     this.pcmBuffer = new Float32Array(this.analyser.fftSize);
     this.state = "active";
-    if (import.meta.env.DEV) console.log("[mic] state -> active. analyser ready, fftSize=" + this.analyser?.fftSize);
 
     // Detect mic disconnect
     for (const track of this.stream.getTracks()) {

@@ -54,8 +54,6 @@ export class Game {
 
   // Footstep SFX timing
   private footstepTimer = 0;
-  private _diagFrameCount = 0;
-  private _diagSuspFrame = 0;
   private static readonly FOOTSTEP_WALK_MS = 400;
   private static readonly FOOTSTEP_RUN_MS = 250;
 
@@ -254,33 +252,6 @@ export class Game {
       const rms = micAnalyser.sample();
       const delta = suspicionDeltaForFrame(rms, dtMS);
       this.monster.addSuspicion(delta);
-
-      if (import.meta.env.DEV) {
-        this._diagSuspFrame++;
-        if (this._diagSuspFrame % 60 === 0) {
-          console.log(
-            `[mic] state=${micAnalyser.state} ` +
-            `rawRms=${rms.toFixed(4)} ` +
-            `smoothed=${micAnalyser.smoothedRms.toFixed(4)}`
-          );
-          console.log(
-            `[delta] rms=${rms.toFixed(4)} ` +
-            `dtMS=${dtMS.toFixed(1)} ` +
-            `delta=${delta.toFixed(4)} ` +
-            `monsterExists=true ` +
-            `addSuspicionCalled=yes`
-          );
-        }
-      }
-    } else if (import.meta.env.DEV) {
-      this._diagSuspFrame++;
-      if (this._diagSuspFrame % 60 === 0) {
-        console.log(
-          `[mic] GATE BLOCKED. ` +
-          `monsterExists=${this.monster !== null && this.monster !== undefined} ` +
-          `micState=${micAnalyser.state}`
-        );
-      }
     }
 
     this.handleInteraction();
@@ -414,24 +385,9 @@ export class Game {
   // ── Catch detection ──
 
   private checkCaught(): void {
-    if (import.meta.env.DEV) {
-      if (++this._diagFrameCount % 60 === 0) {
-        console.log(
-          `[checkCaught] phase=${this.state.phase} ` +
-          `room=${this.state.currentRoom} ` +
-          `locked=${this.locked} ` +
-          `monsterExists=${this.monster !== null && this.monster !== undefined} ` +
-          `monsterState=${this.monster?.state ?? "n/a"}`
-        );
-      }
-    }
-
     if (!this.monster) return;
     if (!this.monster.isPlayerCaught()) return;
 
-    if (import.meta.env.DEV) {
-      console.log("[checkCaught] CATCH FIRED, calling triggerDeath()");
-    }
     this.triggerDeath();
   }
 
@@ -472,9 +428,6 @@ export class Game {
     toRoom: RoomId,
     spawnX: number,
   ): Promise<void> {
-    if (import.meta.env.DEV) {
-      console.log(`[room] transitionToRoom(${toRoom}, spawnX=${spawnX}) starting. current=${this.state.currentRoom}`);
-    }
     this.locked = true;
 
     await fadeTransition(this.app.stage, this.app.ticker, () => {
@@ -501,10 +454,6 @@ export class Game {
         this.flashlight.update(screenX, screenY);
       }
 
-      if (import.meta.env.DEV) {
-        console.log(`[room] player repositioned to (${this.player.x}, ${this.player.y}) in ${toRoom}`);
-      }
-
       // Populate new room
       this.createPickups();
       this.createMonster();
@@ -515,10 +464,6 @@ export class Game {
     });
 
     this.locked = false;
-
-    if (import.meta.env.DEV) {
-      console.log(`[room] transitionToRoom complete. now in ${this.state.currentRoom}`);
-    }
 
     // Show tutorial if returning to reception (only fires once per play session)
     this.maybeShowReceptionTutorial();
@@ -574,14 +519,6 @@ export class Game {
     this.monster.y = this.rooms.currentRoom.floorY;
     this.world.addChild(this.monster);
 
-    if (import.meta.env.DEV) {
-      console.log(
-        `[room] monster spawned in ${def.id} at x=${this.monster.x.toFixed(0)}. ` +
-        `playerRef=${this.player !== null && this.player !== undefined} ` +
-        `playerX=${this.player?.x ?? "n/a"}`
-      );
-    }
-
     // Wire vocal coupling (audio stays in Game, Monster stays pure)
     this.monster.onStateChange = (state) => this.handleMonsterStateChange(state);
     // Start patrol breath for initial PATROL state
@@ -591,24 +528,14 @@ export class Game {
   // ── Death flow ──
 
   private triggerDeath(): void {
-    if (import.meta.env.DEV) {
-      console.log(`[death] triggerDeath called. phase=${this.state.phase} locked=${this.locked}`);
-    }
-
-    if (this.state.phase !== "PLAYING") {
-      if (import.meta.env.DEV) console.log(`[death] BLOCKED by phase=${this.state.phase}`);
-      return;
-    }
+    if (this.state.phase !== "PLAYING") return;
 
     this.state.phase = "DYING";
-    if (import.meta.env.DEV) console.log("[death] phase set to DYING");
 
     this.clearTutorialTimers();
     this.player.startCaughtSequence();
     audioManager.stopAllMonsterVocals();
     audioManager.playOneShot("death_thud");
-
-    if (import.meta.env.DEV) console.log("[death] caught sequence started, death_thud played");
   }
 
   private async showGameover(): Promise<void> {
