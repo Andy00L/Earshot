@@ -1,0 +1,11 @@
+{
+  "project_name": "Earshot",
+  "format_on_save": "off",
+  "indent_guides": {
+    "background_coloring": "disabled",
+  },
+  "terminal": {
+    "shell": {
+      "program": "C:/Program Files/Git/bin/bash.exe"
+    },
+  },}

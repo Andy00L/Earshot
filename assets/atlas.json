@@ -1,0 +1,493 @@
+{
+  "cubicles": {
+    "type": "single",
+    "file": "assets/cubicles.png",
+    "width": 3344,
+    "height": 941
+  },
+  "gameover": {
+    "type": "single",
+    "file": "assets/gameover.png",
+    "width": 1672,
+    "height": 941
+  },
+  "props": {
+    "type": "tileset",
+    "tiles": {
+      "door-closed": {
+        "file": "assets/props/door-closed.png",
+        "width": 189,
+        "height": 294
+      },
+      "door-open": {
+        "file": "assets/props/door-open.png",
+        "width": 208,
+        "height": 326
+      },
+      "desk-hide": {
+        "file": "assets/props/desk-hide.png",
+        "width": 301,
+        "height": 201
+      },
+      "locker-hide": {
+        "file": "assets/props/locker-hide.png",
+        "width": 144,
+        "height": 317
+      },
+      "keycard": {
+        "file": "assets/props/keycard.png",
+        "width": 354,
+        "height": 220
+      },
+      "breaker-off": {
+        "file": "assets/props/breaker-off.png",
+        "width": 167,
+        "height": 329
+      },
+      "breaker-on": {
+        "file": "assets/props/breaker-on.png",
+        "width": 169,
+        "height": 338
+      },
+      "vent": {
+        "file": "assets/props/vent.png",
+        "width": 244,
+        "height": 242
+      },
+      "flickerlight": {
+        "file": "assets/props/flickerlight.png",
+        "width": 235,
+        "height": 289
+      },
+      "radio-table": {
+        "file": "assets/props/radio-table.png",
+        "width": 235,
+        "height": 334
+      },
+      "exit-sign": {
+        "file": "assets/props/exit-sign.png",
+        "width": 284,
+        "height": 169
+      },
+      "corpse": {
+        "file": "assets/props/corpse.png",
+        "width": 312,
+        "height": 283
+      }
+    },
+    "cols": 6,
+    "rows": 2
+  },
+  "radio": {
+    "type": "single",
+    "file": "assets/radio.png",
+    "width": 431,
+    "height": 1139
+  },
+  "reception": {
+    "type": "single",
+    "file": "assets/reception.png",
+    "width": 2896,
+    "height": 1086
+  },
+  "server": {
+    "type": "single",
+    "file": "assets/server.png",
+    "width": 3344,
+    "height": 941
+  },
+  "stairwell": {
+    "type": "single",
+    "file": "assets/stairwell.png",
+    "width": 3344,
+    "height": 941
+  },
+  "title": {
+    "type": "single",
+    "file": "assets/title.png",
+    "width": 1672,
+    "height": 941
+  },
+  "monster": {
+    "type": "character",
+    "frames": {
+      "alert1": {
+        "file": "assets/monster/alert1.png",
+        "width": 247,
+        "height": 491,
+        "baselineY": 490,
+        "sourceAtlas": "monster-alert"
+      },
+      "alert2": {
+        "file": "assets/monster/alert2.png",
+        "width": 261,
+        "height": 447,
+        "baselineY": 446,
+        "sourceAtlas": "monster-alert"
+      },
+      "hunt1": {
+        "file": "assets/monster/hunt1.png",
+        "width": 386,
+        "height": 343,
+        "baselineY": 342,
+        "sourceAtlas": "monster-alert"
+      },
+      "hunt2": {
+        "file": "assets/monster/hunt2.png",
+        "width": 353,
+        "height": 271,
+        "baselineY": 270,
+        "sourceAtlas": "monster-alert"
+      },
+      "hunt3": {
+        "file": "assets/monster/hunt3.png",
+        "width": 399,
+        "height": 335,
+        "baselineY": 334,
+        "sourceAtlas": "monster-alert"
+      },
+      "hunt4": {
+        "file": "assets/monster/hunt4.png",
+        "width": 369,
+        "height": 262,
+        "baselineY": 261,
+        "sourceAtlas": "monster-alert"
+      },
+      "attack3": {
+        "file": "assets/monster/attack3.png",
+        "width": 621,
+        "height": 514,
+        "baselineY": 513,
+        "sourceAtlas": "monster-attack"
+      },
+      "howl1": {
+        "file": "assets/monster/howl1.png",
+        "width": 286,
+        "height": 636,
+        "baselineY": 635,
+        "sourceAtlas": "monster-attack"
+      },
+      "howl2": {
+        "file": "assets/monster/howl2.png",
+        "width": 583,
+        "height": 647,
+        "baselineY": 646,
+        "sourceAtlas": "monster-attack"
+      },
+      "idle1": {
+        "file": "assets/monster/idle1.png",
+        "width": 266,
+        "height": 556,
+        "baselineY": 555,
+        "sourceAtlas": "monster-base"
+      },
+      "idle2": {
+        "file": "assets/monster/idle2.png",
+        "width": 261,
+        "height": 551,
+        "baselineY": 550,
+        "sourceAtlas": "monster-base"
+      },
+      "walk1": {
+        "file": "assets/monster/walk1.png",
+        "width": 333,
+        "height": 545,
+        "baselineY": 544,
+        "sourceAtlas": "monster-base"
+      },
+      "walk2": {
+        "file": "assets/monster/walk2.png",
+        "width": 294,
+        "height": 547,
+        "baselineY": 546,
+        "sourceAtlas": "monster-base"
+      },
+      "walk3": {
+        "file": "assets/monster/walk3.png",
+        "width": 322,
+        "height": 542,
+        "baselineY": 541,
+        "sourceAtlas": "monster-base"
+      },
+      "walk4": {
+        "file": "assets/monster/walk4.png",
+        "width": 278,
+        "height": 547,
+        "baselineY": 546,
+        "sourceAtlas": "monster-base"
+      },
+      "charge1": {
+        "file": "assets/monster/charge1.png",
+        "width": 362,
+        "height": 230,
+        "baselineY": 229,
+        "sourceAtlas": "monster-charge"
+      },
+      "charge2": {
+        "file": "assets/monster/charge2.png",
+        "width": 249,
+        "height": 206,
+        "baselineY": 205,
+        "sourceAtlas": "monster-charge"
+      },
+      "charge3": {
+        "file": "assets/monster/charge3.png",
+        "width": 349,
+        "height": 238,
+        "baselineY": 237,
+        "sourceAtlas": "monster-charge"
+      },
+      "charge4": {
+        "file": "assets/monster/charge4.png",
+        "width": 343,
+        "height": 216,
+        "baselineY": 215,
+        "sourceAtlas": "monster-charge"
+      },
+      "attack1": {
+        "file": "assets/monster/attack1.png",
+        "width": 311,
+        "height": 374,
+        "baselineY": 373,
+        "sourceAtlas": "monster-charge"
+      },
+      "attack2": {
+        "file": "assets/monster/attack2.png",
+        "width": 383,
+        "height": 344,
+        "baselineY": 343,
+        "sourceAtlas": "monster-charge"
+      }
+    },
+    "boundingBox": {
+      "width": 621,
+      "height": 647
+    }
+  },
+  "player": {
+    "type": "character",
+    "frames": {
+      "idle": {
+        "file": "assets/player/idle.png",
+        "width": 192,
+        "height": 357,
+        "baselineY": 356,
+        "sourceAtlas": "player-base"
+      },
+      "walk1": {
+        "file": "assets/player/walk1.png",
+        "width": 231,
+        "height": 351,
+        "baselineY": 350,
+        "sourceAtlas": "player-base"
+      },
+      "walk2": {
+        "file": "assets/player/walk2.png",
+        "width": 184,
+        "height": 353,
+        "baselineY": 352,
+        "sourceAtlas": "player-base"
+      },
+      "walk3": {
+        "file": "assets/player/walk3.png",
+        "width": 252,
+        "height": 353,
+        "baselineY": 352,
+        "sourceAtlas": "player-base"
+      },
+      "walk4": {
+        "file": "assets/player/walk4.png",
+        "width": 164,
+        "height": 352,
+        "baselineY": 351,
+        "sourceAtlas": "player-base"
+      },
+      "crouch": {
+        "file": "assets/player/crouch.png",
+        "width": 191,
+        "height": 243,
+        "baselineY": 242,
+        "sourceAtlas": "player-base"
+      },
+      "dead": {
+        "file": "assets/player/dead.png",
+        "width": 434,
+        "height": 141,
+        "baselineY": 140,
+        "sourceAtlas": "player-base"
+      },
+      "caught1": {
+        "file": "assets/player/caught1.png",
+        "width": 343,
+        "height": 382,
+        "baselineY": 381,
+        "sourceAtlas": "player-caught"
+      },
+      "caught2": {
+        "file": "assets/player/caught2.png",
+        "width": 303,
+        "height": 418,
+        "baselineY": 417,
+        "sourceAtlas": "player-caught"
+      },
+      "caught3": {
+        "file": "assets/player/caught3.png",
+        "width": 295,
+        "height": 378,
+        "baselineY": 377,
+        "sourceAtlas": "player-caught"
+      },
+      "dead-collapsed": {
+        "file": "assets/player/dead-collapsed.png",
+        "width": 342,
+        "height": 176,
+        "baselineY": 175,
+        "sourceAtlas": "player-caught"
+      },
+      "dead-blood": {
+        "file": "assets/player/dead-blood.png",
+        "width": 330,
+        "height": 172,
+        "baselineY": 171,
+        "sourceAtlas": "player-caught"
+      },
+      "dead-flashlight-out": {
+        "file": "assets/player/dead-flashlight-out.png",
+        "width": 330,
+        "height": 169,
+        "baselineY": 168,
+        "sourceAtlas": "player-caught"
+      },
+      "crouch-idle1": {
+        "file": "assets/player/crouch-idle1.png",
+        "width": 264,
+        "height": 313,
+        "baselineY": 312,
+        "sourceAtlas": "player-crouch"
+      },
+      "crouch-idle2": {
+        "file": "assets/player/crouch-idle2.png",
+        "width": 265,
+        "height": 307,
+        "baselineY": 306,
+        "sourceAtlas": "player-crouch"
+      },
+      "crouch-walk1": {
+        "file": "assets/player/crouch-walk1.png",
+        "width": 309,
+        "height": 315,
+        "baselineY": 314,
+        "sourceAtlas": "player-crouch"
+      },
+      "crouch-walk2": {
+        "file": "assets/player/crouch-walk2.png",
+        "width": 318,
+        "height": 297,
+        "baselineY": 296,
+        "sourceAtlas": "player-crouch"
+      },
+      "crouch-walk3": {
+        "file": "assets/player/crouch-walk3.png",
+        "width": 288,
+        "height": 309,
+        "baselineY": 308,
+        "sourceAtlas": "player-crouch"
+      },
+      "crouch-walk4": {
+        "file": "assets/player/crouch-walk4.png",
+        "width": 270,
+        "height": 298,
+        "baselineY": 297,
+        "sourceAtlas": "player-crouch"
+      },
+      "run1": {
+        "file": "assets/player/run1.png",
+        "width": 365,
+        "height": 312,
+        "baselineY": 311,
+        "sourceAtlas": "player-run"
+      },
+      "run2": {
+        "file": "assets/player/run2.png",
+        "width": 230,
+        "height": 261,
+        "baselineY": 260,
+        "sourceAtlas": "player-run"
+      },
+      "run3": {
+        "file": "assets/player/run3.png",
+        "width": 384,
+        "height": 313,
+        "baselineY": 312,
+        "sourceAtlas": "player-run"
+      },
+      "run4": {
+        "file": "assets/player/run4.png",
+        "width": 227,
+        "height": 259,
+        "baselineY": 258,
+        "sourceAtlas": "player-run"
+      },
+      "run-stop": {
+        "file": "assets/player/run-stop.png",
+        "width": 319,
+        "height": 315,
+        "baselineY": 314,
+        "sourceAtlas": "player-run"
+      },
+      "run-look-back": {
+        "file": "assets/player/run-look-back.png",
+        "width": 252,
+        "height": 351,
+        "baselineY": 350,
+        "sourceAtlas": "player-run"
+      },
+      "scared-idle1": {
+        "file": "assets/player/scared-idle1.png",
+        "width": 195,
+        "height": 393,
+        "baselineY": 392,
+        "sourceAtlas": "player-scared"
+      },
+      "scared-idle2": {
+        "file": "assets/player/scared-idle2.png",
+        "width": 210,
+        "height": 388,
+        "baselineY": 387,
+        "sourceAtlas": "player-scared"
+      },
+      "scared-walk1": {
+        "file": "assets/player/scared-walk1.png",
+        "width": 247,
+        "height": 378,
+        "baselineY": 377,
+        "sourceAtlas": "player-scared"
+      },
+      "scared-walk2": {
+        "file": "assets/player/scared-walk2.png",
+        "width": 268,
+        "height": 381,
+        "baselineY": 380,
+        "sourceAtlas": "player-scared"
+      },
+      "scared-walk3": {
+        "file": "assets/player/scared-walk3.png",
+        "width": 230,
+        "height": 382,
+        "baselineY": 381,
+        "sourceAtlas": "player-scared"
+      },
+      "scared-walk4": {
+        "file": "assets/player/scared-walk4.png",
+        "width": 229,
+        "height": 374,
+        "baselineY": 373,
+        "sourceAtlas": "player-scared"
+      }
+    },
+    "boundingBox": {
+      "width": 434,
+      "height": 418
+    }
+  }
+}

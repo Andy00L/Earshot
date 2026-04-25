@@ -1,0 +1,104 @@
+# ============================================================
+# Earshot .gitignore
+# Comprehensive ignore for Vite + TypeScript + game project
+# ============================================================
+
+# --- Secrets ---
+# NEVER commit these. They contain API keys and per-environment config.
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.pem
+*.key
+
+# --- Dependencies ---
+# Regeneratable from package.json. Never commit.
+node_modules/
+.pnp
+.pnp.js
+
+# --- Build output ---
+# Regeneratable from `npm run build`. Never commit.
+dist/
+dist-ssr/
+build/
+*.local
+
+# --- Editor and IDE ---
+# Most editor configs are machine-specific.
+# .zed/ is intentionally KEPT (relevant for Zed hackathon).
+.claude/
+.vscode/
+.idea/
+*.swp
+*.swo
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# --- OS junk ---
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# --- Logs ---
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# --- Cache and tmp ---
+.cache/
+.parcel-cache/
+.next/
+.nuxt/
+.turbo/
+.eslintcache
+*.tsbuildinfo
+.vite/
+
+# --- Test coverage ---
+coverage/
+*.lcov
+.nyc_output/
+
+# --- Python pipeline (asset slicing scripts) ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+ENV/
+env/
+
+# --- Pip install artifacts (these are NOT real files; bash redirects from `>=X.Y.Z`) ---
+=*
+
+# --- Raw assets (kept locally for re-slicing, not needed in repo) ---
+# The repo has the sliced output in assets/. Source images live in raw/ for archive only.
+raw/
+
+# --- Reference prompts (not Earshot-specific) ---
+# These are the user's general workflow templates, not part of the game.
+REFERENCE_DOCUMENTATION_AUDIT.md
+REFERENCE_SECURITY_AUDIT.md
+REFERENCE_PREMIUM_UI.md
+
+# --- Personal docs that are not part of the public submission ---
+docs/CATCH_DIAGNOSTIC_RUN.md
+
+# --- Project-specific outputs ---
+# If asset generation creates intermediate files, add patterns here.
+*.bak
+*.tmp
+*.orig

@@ -1,0 +1,28 @@
+{
+  "name": "hush-assets",
+  "version": "0.2.0",
+  "type": "module",
+  "description": "Asset pipeline for Hush — hand-drawn atmospheric horror. Drop PNGs into raw/, run npm run slice.",
+  "scripts": {
+    "slice": "python scripts/slice.py",
+    "slice:clean": "python scripts/slice.py --clean",
+    "slice:debug": "python scripts/slice.py --debug",
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "audio:generate": "tsx scripts/generate-audio.ts",
+    "audio:list": "tsx scripts/generate-audio.ts --list"
+  },
+  "dependencies": {
+    "howler": "^2.2.4",
+    "pixi.js": "^8.0.0"
+  },
+  "devDependencies": {
+    "@elevenlabs/elevenlabs-js": "^2.44.0",
+    "@types/howler": "^2.2.12",
+    "dotenv": "^17.4.2",
+    "tsx": "^4.21.0",
+    "typescript": "^5.0.0",
+    "vite": "^6.0.0"
+  }
+}
