@@ -5,6 +5,9 @@ export class HUD {
   private msgBox: Container | null = null;
   private msgTimer = 0;
   private suspicionBar: Graphics | null = null;
+  private promptBox: Container | null = null;
+  private currentPromptStr: string = "";
+  private hiddenIndicator: Container | null = null;
 
   constructor(parent: Container) {
     this.container = new Container();
@@ -90,6 +93,72 @@ export class HUD {
     }
   }
 
+  showPrompt(text: string): void {
+    if (text === this.currentPromptStr && this.promptBox) return;
+    this.clearPrompt();
+    this.currentPromptStr = text;
+
+    const box = new Container();
+    const padX = 16;
+    const padY = 8;
+    const fontSize = 18;
+    const boxW = text.length * (fontSize * 0.62) + padX * 2;
+    const boxH = fontSize + padY * 2;
+
+    const bg = new Graphics();
+    bg.roundRect(0, 0, boxW, boxH, 6);
+    bg.fill({ color: 0x222222, alpha: 0.85 });
+    box.addChild(bg);
+
+    const label = new Text({
+      text,
+      style: { fontFamily: "monospace", fontSize, fill: 0xaaddff },
+    });
+    label.x = padX;
+    label.y = padY;
+    box.addChild(label);
+
+    box.x = 640 - boxW / 2;
+    box.y = 580;
+
+    this.container.addChild(box);
+    this.promptBox = box;
+  }
+
+  clearPrompt(): void {
+    this.currentPromptStr = "";
+    if (this.promptBox) {
+      this.container.removeChild(this.promptBox);
+      this.promptBox.destroy({ children: true });
+      this.promptBox = null;
+    }
+  }
+
+  setHiddenVisible(visible: boolean): void {
+    if (visible && !this.hiddenIndicator) {
+      const box = new Container();
+      const label = new Text({
+        text: "HIDDEN",
+        style: { fontFamily: "monospace", fontSize: 14, fill: 0x88ccff },
+      });
+      const bg = new Graphics();
+      bg.roundRect(0, 0, label.width + 16, label.height + 8, 4);
+      bg.fill({ color: 0x000000, alpha: 0.6 });
+      box.addChild(bg);
+      label.x = 8;
+      label.y = 4;
+      box.addChild(label);
+      box.x = 1280 - label.width - 30;
+      box.y = 10;
+      this.container.addChild(box);
+      this.hiddenIndicator = box;
+    } else if (!visible && this.hiddenIndicator) {
+      this.container.removeChild(this.hiddenIndicator);
+      this.hiddenIndicator.destroy({ children: true });
+      this.hiddenIndicator = null;
+    }
+  }
+
   private clearMessage(): void {
     if (this.msgBox) {
       this.container.removeChild(this.msgBox);
@@ -100,6 +169,8 @@ export class HUD {
 
   destroy(): void {
     this.clearMessage();
+    this.clearPrompt();
+    this.setHiddenVisible(false);
     if (this.suspicionBar) {
       this.suspicionBar.destroy();
       this.suspicionBar = null;

@@ -1,8 +1,9 @@
 import { Container, AnimatedSprite, Texture } from 'pixi.js';
 import { Manifest, getFrameTexture, getFrameMeta } from './assets';
 import { Input } from './input';
+import type { HidingSpotKind } from './types';
 
-export type PlayerState = 'IDLE' | 'WALK' | 'RUN' | 'CROUCH_IDLE' | 'CROUCH_WALK' | 'CAUGHT';
+export type PlayerState = 'IDLE' | 'WALK' | 'RUN' | 'CROUCH_IDLE' | 'CROUCH_WALK' | 'HIDING_LOCKER' | 'HIDING_DESK' | 'CAUGHT';
 
 interface AnimDef {
   frameNames: string[];
@@ -11,12 +12,14 @@ interface AnimDef {
 }
 
 const ANIM_DEFS: Record<PlayerState, AnimDef> = {
-  IDLE:        { frameNames: ['idle'],                                                         speed: 0,     moveSpeed: 0 },
-  WALK:        { frameNames: ['walk1', 'walk2', 'walk3', 'walk4'],                             speed: 0.13,  moveSpeed: 3 },
-  RUN:         { frameNames: ['run1', 'run2', 'run3', 'run4'],                                 speed: 0.2,   moveSpeed: 6 },
-  CROUCH_IDLE: { frameNames: ['crouch-idle1', 'crouch-idle2'],                                 speed: 0.05,  moveSpeed: 0 },
-  CROUCH_WALK: { frameNames: ['crouch-walk1', 'crouch-walk2', 'crouch-walk3', 'crouch-walk4'], speed: 0.1,   moveSpeed: 1.5 },
-  CAUGHT:      { frameNames: ['caught1', 'caught2', 'caught3', 'dead-collapsed'],              speed: 0.083, moveSpeed: 0 },
+  IDLE:           { frameNames: ['idle'],                                                         speed: 0,     moveSpeed: 0 },
+  WALK:           { frameNames: ['walk1', 'walk2', 'walk3', 'walk4'],                             speed: 0.13,  moveSpeed: 3 },
+  RUN:            { frameNames: ['run1', 'run2', 'run3', 'run4'],                                 speed: 0.2,   moveSpeed: 6 },
+  CROUCH_IDLE:    { frameNames: ['crouch-idle1', 'crouch-idle2'],                                 speed: 0.05,  moveSpeed: 0 },
+  CROUCH_WALK:    { frameNames: ['crouch-walk1', 'crouch-walk2', 'crouch-walk3', 'crouch-walk4'], speed: 0.1,   moveSpeed: 1.5 },
+  HIDING_LOCKER:  { frameNames: ['crouch-idle1', 'crouch-idle2'],                                 speed: 0.03,  moveSpeed: 0 },
+  HIDING_DESK:    { frameNames: ['crouch-idle1', 'crouch-idle2'],                                 speed: 0.03,  moveSpeed: 0 },
+  CAUGHT:         { frameNames: ['caught1', 'caught2', 'caught3', 'dead-collapsed'],              speed: 0.083, moveSpeed: 0 },
 };
 
 export class Player extends Container {
@@ -111,6 +114,31 @@ export class Player extends Container {
     // Reset state identity so setState will accept CAUGHT
     this.currentState = undefined as unknown as PlayerState;
     this.setState('CAUGHT');
+  }
+
+  /** Enter a hiding pose (locks input until setStandingPose). */
+  setHidingPose(kind: HidingSpotKind): void {
+    this.stateLocked = true;
+    this.caughtComplete = false;
+    this.currentState = undefined as unknown as PlayerState;
+    this.setState(kind === "locker" ? "HIDING_LOCKER" : "HIDING_DESK");
+  }
+
+  /** Exit hiding, return to idle. */
+  setStandingPose(): void {
+    this.stateLocked = false;
+    this.caughtComplete = false;
+    this.currentState = undefined as unknown as PlayerState;
+    this.setState("IDLE");
+  }
+
+  /** True when crouching or hiding under a desk (used for decay multiplier). */
+  isCrouching(): boolean {
+    return (
+      this.currentState === "CROUCH_IDLE" ||
+      this.currentState === "CROUCH_WALK" ||
+      this.currentState === "HIDING_DESK"
+    );
   }
 
   update(dt: number, input: Input) {

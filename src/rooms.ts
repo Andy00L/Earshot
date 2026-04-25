@@ -27,6 +27,24 @@ export const ROOM_DEFINITIONS: Record<RoomId, RoomDefinition> = {
         requirement: "press_e",
       },
     ],
+    hidingSpots: [],
+    decorativeProps: [
+      {
+        id: "exit_sign_recep",
+        frameName: "exit-sign",
+        x: 2200,
+        y: 350,
+        scale: 0.6,
+      },
+      {
+        id: "flickerlight_recep",
+        frameName: "flickerlight",
+        x: 200,
+        y: 350,
+        scale: 0.7,
+        flickerAnimation: true,
+      },
+    ],
   },
 
   cubicles: {
@@ -62,6 +80,16 @@ export const ROOM_DEFINITIONS: Record<RoomId, RoomDefinition> = {
         toX: 150,
         requirement: "press_e",
       },
+    ],
+    hidingSpots: [
+      { id: "desk_cub_1", kind: "desk", x: 1200, y: 866, triggerWidth: 100 },
+      { id: "locker_cub_1", kind: "locker", x: 2050, y: 866, triggerWidth: 80 },
+      { id: "desk_cub_2", kind: "desk", x: 2900, y: 866, triggerWidth: 100 },
+    ],
+    decorativeProps: [
+      { id: "vent_cub_1", frameName: "vent", x: 600, y: 200, scale: 0.5 },
+      { id: "vent_cub_2", frameName: "vent", x: 2400, y: 200, scale: 0.5 },
+      { id: "exit_sign_cub", frameName: "exit-sign", x: 3300, y: 350, scale: 0.5, alpha: 0.8 },
     ],
   },
 
@@ -101,6 +129,15 @@ export const ROOM_DEFINITIONS: Record<RoomId, RoomDefinition> = {
         failMessage: "The door is locked. Power must be on.",
       },
     ],
+    hidingSpots: [
+      { id: "locker_server_1", kind: "locker", x: 700, y: 866, triggerWidth: 80 },
+      { id: "locker_server_2", kind: "locker", x: 2900, y: 866, triggerWidth: 80 },
+    ],
+    decorativeProps: [
+      { id: "corpse_server", frameName: "corpse", x: 1500, y: 866, scale: 1.0 },
+      { id: "flickerlight_server_1", frameName: "flickerlight", x: 800, y: 250, scale: 0.6, flickerAnimation: true },
+      { id: "vent_server", frameName: "vent", x: 2700, y: 200, scale: 0.5 },
+    ],
   },
 
   stairwell: {
@@ -129,6 +166,12 @@ export const ROOM_DEFINITIONS: Record<RoomId, RoomDefinition> = {
         failMessage: "The exit is locked. You need a keycard.",
         isExit: true,
       },
+    ],
+    hidingSpots: [
+      { id: "desk_stair", kind: "desk", x: 1400, y: 866, triggerWidth: 100 },
+    ],
+    decorativeProps: [
+      { id: "exit_sign_stairwell", frameName: "exit-sign", x: 2700, y: 350, scale: 0.7, alpha: 0.9 },
     ],
   },
 };

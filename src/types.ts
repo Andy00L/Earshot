@@ -39,12 +39,19 @@ export interface PickupConfig {
   togglesTo?: string; // if set, interaction swaps frame instead of collecting
 }
 
+export interface HidingState {
+  active: boolean;
+  spotId: string | null;
+  kind: HidingSpotKind | null;
+}
+
 export interface GameState {
   phase: GamePhase;
   currentRoom: RoomId;
   inventory: Set<PickupId>;
   breakerOn: boolean;
   hasShownReceptionTutorial: boolean;
+  hidingState: HidingState;
 }
 
 export function createInitialGameState(): GameState {
@@ -54,7 +61,30 @@ export function createInitialGameState(): GameState {
     inventory: new Set(),
     breakerOn: false,
     hasShownReceptionTutorial: false,
+    hidingState: { active: false, spotId: null, kind: null },
   };
+}
+
+// Hiding spot types
+export type HidingSpotKind = "locker" | "desk";
+
+export interface HidingSpotDef {
+  id: string;
+  kind: HidingSpotKind;
+  x: number;
+  y: number;
+  triggerWidth: number;
+}
+
+// Decorative prop types (no interaction, visual only)
+export interface DecorativePropDef {
+  id: string;
+  frameName: string;
+  x: number;
+  y: number;
+  scale?: number;
+  alpha?: number;
+  flickerAnimation?: boolean;
 }
 
 export interface RoomDefinition {
@@ -67,4 +97,6 @@ export interface RoomDefinition {
   playerSpawnFromRight: number;
   pickups: PickupConfig[];
   doors: DoorConfig[];
+  hidingSpots?: HidingSpotDef[];
+  decorativeProps?: DecorativePropDef[];
 }

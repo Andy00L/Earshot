@@ -22,7 +22,11 @@ export type SfxId =
   | "keycard_pickup"
   | "player_breath_normal"
   | "win_chime"
-  | "death_thud";
+  | "death_thud"
+  | "locker_close"
+  | "locker_open"
+  | "locker_door_creak"
+  | "desk_crouch";
 
 export type RadioVoiceId =
   | "radio_intro"
@@ -207,6 +211,40 @@ export const AUDIO_CATALOG: Record<AudioId, AudioAsset> = {
     durationSec: 1,
     loop: false,
     volume: 0.8,
+  },
+
+  // HIDING SFX (Sound Effects API)
+  locker_close: {
+    id: "locker_close",
+    category: "sfx",
+    prompt: "Metal locker door slamming closed with a heavy clang. About 1 second.",
+    durationSec: 1,
+    loop: false,
+    volume: 0.6,
+  },
+  locker_open: {
+    id: "locker_open",
+    category: "sfx",
+    prompt: "Metal locker door creaking open slowly. About 1 second.",
+    durationSec: 1,
+    loop: false,
+    volume: 0.5,
+  },
+  locker_door_creak: {
+    id: "locker_door_creak",
+    category: "sfx",
+    prompt: "Brief metal locker door creak, like someone testing the latch quietly. About 0.4 seconds.",
+    durationSec: 1,
+    loop: false,
+    volume: 0.3,
+  },
+  desk_crouch: {
+    id: "desk_crouch",
+    category: "sfx",
+    prompt: "Soft cloth and wood rustle as someone ducks under a desk. About 0.5 seconds.",
+    durationSec: 1,
+    loop: false,
+    volume: 0.4,
   },
 
   // RADIO OPERATOR VOICE (TTS)

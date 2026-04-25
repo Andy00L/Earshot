@@ -131,6 +131,20 @@ export class Monster extends Container {
     this._suspicion = Math.min(SUSPICION_MAX, Math.max(0, this._suspicion + amount));
   }
 
+  setSuspicion(value: number): void {
+    this._suspicion = Math.min(SUSPICION_MAX, Math.max(0, value));
+  }
+
+  /** Apply suspicion decay with a multiplier. Called from Game each frame.
+   *  Decay applies in PATROL, ALERT, HUNT, CHARGE. Not in ATTACK or IDLE_HOWL. */
+  applyDecay(dtMS: number, multiplier: number = 1): void {
+    if (this.state === "ATTACK" || this.state === "IDLE_HOWL") return;
+    this._suspicion = Math.max(
+      0,
+      this._suspicion - SUSPICION_DECAY_PER_SEC * multiplier * (dtMS / 1000),
+    );
+  }
+
   public onStateChange: ((state: MonsterState) => void) | null = null;
 
   update(dt: number, dtMS: number): void {
@@ -204,11 +218,7 @@ export class Monster extends Container {
   // ── State updates ──
 
   private updatePatrol(dt: number, dtMS: number): void {
-    // Decay suspicion
-    this._suspicion = Math.max(
-      0,
-      this._suspicion - (SUSPICION_DECAY_PER_SEC * dtMS) / 1000,
-    );
+    // Decay is now handled externally via applyDecay() called from Game
 
     // Check alert threshold
     if (this._suspicion >= SUSPICION_ALERT) {
