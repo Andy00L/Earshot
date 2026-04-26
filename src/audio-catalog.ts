@@ -12,6 +12,8 @@ export type MonsterVocalId =
   | "monster_attack_lunge"
   | "monster_idle_howl";
 
+export type MonsterConfusedVocalId = "confused_growl" | "monster_growl_close";
+
 export type SfxId =
   | "footstep_concrete"
   | "footstep_concrete_run"
@@ -36,7 +38,7 @@ export type RadioVoiceId =
   | "radio_breaker_hint"
   | "radio_exit_hint";
 
-export type AudioId = AmbientId | MonsterVocalId | SfxId | RadioVoiceId;
+export type AudioId = AmbientId | MonsterVocalId | MonsterConfusedVocalId | SfxId | RadioVoiceId;
 
 export interface AudioAsset {
   id: AudioId;
@@ -131,6 +133,24 @@ export const AUDIO_CATALOG: Record<AudioId, AudioAsset> = {
     durationSec: 3,
     loop: false,
     volume: 0.9,
+  },
+
+  // MONSTER CONFUSED / DEATH VOCALS
+  confused_growl: {
+    id: "confused_growl",
+    category: "monster_vocal",
+    prompt: "Low, confused, hesitant creature growl. Uncertain, sniffing, puzzled. About 2 seconds.",
+    durationSec: 2,
+    loop: false,
+    volume: 0.7,
+  },
+  monster_growl_close: {
+    id: "monster_growl_close",
+    category: "monster_vocal",
+    prompt: "Loud, close-range creature growl right next to the listener. Wet, threatening. About 1.5 seconds.",
+    durationSec: 1.5,
+    loop: false,
+    volume: 1.0,
   },
 
   // SFX (Sound Effects API)

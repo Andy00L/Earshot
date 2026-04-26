@@ -33,9 +33,15 @@ import { Flashlight } from "./flashlight";
 import { AmbientId } from "./audio-catalog";
 import { RadioPopup } from "./radio-popup";
 import { synthesizeTTS } from "./tts";
+import { ScreenShake } from "./screen-shake";
+import { Heartbeat } from "./heartbeat";
+import { Vignette } from "./vignette";
 
 // Survives Game restart (audio stays loaded, mic stays active)
 let audioInitialized = false;
+
+// Tutorial plays once per browser session, not per run
+let tutorialPlayedThisSession = false;
 
 export class Game {
   private app: Application;
@@ -68,8 +74,16 @@ export class Game {
   // Prevents concurrent async operations (room transitions, death fade, win fade)
   private locked = false;
 
+  // Day 5 polish systems
+  private screenShake = new ScreenShake();
+  private heartbeat = new Heartbeat();
+  private vignette: Vignette | null = null;
+
   // End-screen overlay (gameover or win)
   private overlayContainer: Container | null = null;
+
+  // Death fade overlay (tracked for cleanup on restart)
+  private deathFadeOverlay: Graphics | null = null;
 
   // Footstep SFX timing
   private footstepTimer = 0;
@@ -132,6 +146,20 @@ export class Game {
       this.app.screen.width,
       this.app.screen.height,
     );
+    // Position flashlight immediately so first frame isn't misaligned
+    {
+      const screenX = this.player.x + this.world.x;
+      const screenY = this.player.y + this.world.y;
+      this.flashlight.update(screenX, screenY);
+    }
+
+    // Vignette overlay (above flashlight zIndex=100, below HUD zIndex=5000)
+    this.vignette = new Vignette(this.app.screen.width, this.app.screen.height);
+    this.vignette.container.zIndex = 150;
+    this.app.stage.addChild(this.vignette.container);
+
+    // Start heartbeat (AudioContext valid after user gesture from title/click)
+    this.heartbeat.start();
 
     // Tab visibility: pause/resume audio
     this.visibilityHandler = () => {
@@ -148,7 +176,17 @@ export class Game {
 
     this.locked = false;
 
+    // Record run start time
+    this.state.runStats.startTimeMs = performance.now();
+
     this.maybeShowReceptionTutorial();
+
+    // Tutorial radio: 2 seconds after start (once per session)
+    if (!tutorialPlayedThisSession) {
+      this.tutorialTimers.push(
+        setTimeout(() => this.playTutorialTransmission(), 2000),
+      );
+    }
   }
 
   // ── Audio initialization (first launch only) ──
@@ -253,9 +291,7 @@ export class Game {
         break;
 
       case "DYING":
-        if (this.player.caughtComplete && !this.locked) {
-          this.showGameover();
-        }
+        // Death cinematic runs via runDeathCinematic(); tick just advances animation
         break;
 
       case "GAMEOVER":
@@ -309,6 +345,24 @@ export class Game {
     this.handleFootsteps(dtMS);
     this.checkCaught();
     this.updateCamera();
+
+    // Screen shake offset applied after camera
+    this.screenShake.update(dtMS);
+    this.world.x += this.screenShake.offsetX;
+    this.world.y += this.screenShake.offsetY;
+
+    // Heartbeat scales with suspicion
+    this.heartbeat.setSuspicion(this.monster?.suspicion ?? 0);
+    this.heartbeat.tick();
+
+    // Vignette scales with monster state
+    if (this.vignette) {
+      this.vignette.setIntensity(
+        this.monster?.state ?? null,
+        this.monster?.suspicion ?? 0,
+      );
+      this.vignette.update(dtMS);
+    }
 
     // Flicker animations for decorative lights
     for (const ft of this.flickerTimers) {
@@ -374,12 +428,16 @@ export class Game {
         break;
       case "HUNT":
         audioManager.loop("monster_hunt_screech");
+        this.screenShake.trigger(600, 12);
+        this.state.runStats.monsterEncounters++;
         break;
       case "CHARGE":
         audioManager.playOneShot("monster_charge_roar");
+        this.screenShake.trigger(400, 8);
         break;
       case "ATTACK":
         audioManager.playOneShot("monster_attack_lunge");
+        this.screenShake.trigger(300, 16);
         break;
       case "IDLE_HOWL":
         audioManager.playOneShot("monster_idle_howl");
@@ -545,6 +603,29 @@ export class Game {
     this.tutorialTimers = [];
   }
 
+  private async playTutorialTransmission(): Promise<void> {
+    if (tutorialPlayedThisSession) return;
+    if (this.state.phase !== "PLAYING") return;
+    tutorialPlayedThisSession = true;
+
+    this.hud.showMessage("INCOMING TRANSMISSION", 4000);
+
+    try {
+      const result = await synthesizeTTS(
+        "If you can hear this, get out. It hunts by sound. Stay quiet. Stay hidden.",
+      );
+      audioManager.loadAndPlayBlob("tutorial_transmission", result.blobUrl, {
+        volume: 0.9,
+      });
+    } catch (err) {
+      console.warn("[tutorial] TTS failed, falling back to static_burst:", err);
+      if (audioManager.has("static_burst")) {
+        audioManager.playOneShot("static_burst");
+      }
+      this.hud.showMessage("TRANSMISSION CORRUPTED", 3000);
+    }
+  }
+
   // ── Room transitions ──
 
   private async transitionToRoom(
@@ -559,6 +640,7 @@ export class Game {
 
       this.rooms.swapRoom(toRoom);
       this.state.currentRoom = toRoom;
+      this.state.runStats.roomsReached.add(toRoom);
 
       // Adjust world.y for rooms with different heights
       this.world.y =
@@ -670,6 +752,9 @@ export class Game {
     this.monster.onStateChange = (state) => this.handleMonsterStateChange(state);
     // Start patrol breath for initial PATROL state
     audioManager.loop("monster_patrol_breath");
+
+    // Load confused animation frames from manifest
+    this.monster.loadConfusedFrames();
   }
 
   // ── Death flow ──
@@ -678,6 +763,7 @@ export class Game {
     if (this.state.phase !== "PLAYING") return;
 
     this.state.phase = "DYING";
+    this.locked = true;
 
     // Clear hiding state if dying while hidden (desk 50/50 caught)
     if (this.state.hidingState.active) {
@@ -695,28 +781,135 @@ export class Game {
     this.player.startCaughtSequence();
     audioManager.stopAllMonsterVocals();
     audioManager.playOneShot("death_thud");
+    this.screenShake.trigger(800, 20);
 
     // Cancel any pending TTS calls
-    for (const [id, ctrl] of this.armedRadioAborts) {
+    for (const [, ctrl] of this.armedRadioAborts) {
       ctrl.abort();
     }
     this.armedRadioAborts.clear();
     this.state.radio.armedRadios = [];
     this.hud.clearRadioTimer();
     this.hud.showRadioInventory(false);
+
+    // Extended cinematic death sequence
+    this.runDeathCinematic();
   }
 
-  private async showGameover(): Promise<void> {
-    this.locked = true;
+  private async runDeathCinematic(): Promise<void> {
+    // Layer 1: monster looms toward player (400ms)
+    if (this.monster) {
+      const startMX = this.monster.x;
+      const targetMX = this.player.x + 30;
+      const startScale = this.monster.spriteScaleX;
+      const targetScale = startScale * 1.15;
+      await this.animateOverTime(400, (t) => {
+        if (!this.monster) return;
+        this.monster.x = startMX + (targetMX - startMX) * t;
+        this.monster.setSpriteScale(
+          startScale + (targetScale - startScale) * t,
+        );
+      });
+    }
 
-    await fadeTransition(this.app.stage, this.app.ticker, () => {
-      this.buildEndScreen("gameover", "PRESS R TO RESTART");
-      if (this.flashlight) this.flashlight.setVisible(false);
-      audioManager.fadeOutAmbient();
-    });
+    // Layer 2: close growl
+    if (audioManager.has("monster_growl_close")) {
+      audioManager.playOneShot("monster_growl_close");
+    }
 
+    // Layer 3: red-then-black fade (1500ms)
+    await this.fadeToRedThenBlack(1500);
+
+    // Stop heartbeat
+    this.heartbeat.stop();
+
+    // Compute stats and show gameover
+    const stats = this.computeRunStats();
+    this.showGameOverWithStats(stats);
+    if (this.flashlight) this.flashlight.setVisible(false);
+    audioManager.fadeOutAmbient();
     this.state.phase = "GAMEOVER";
     this.locked = false;
+  }
+
+  private animateOverTime(
+    durMs: number,
+    onTick: (t: number) => void,
+  ): Promise<void> {
+    return new Promise((resolve) => {
+      const startTime = performance.now();
+      const tick = () => {
+        const elapsed = performance.now() - startTime;
+        const t = Math.min(1, elapsed / durMs);
+        onTick(t);
+        if (t < 1) requestAnimationFrame(tick);
+        else resolve();
+      };
+      tick();
+    });
+  }
+
+  private async fadeToRedThenBlack(durMs: number): Promise<void> {
+    // Clean up any previous death overlay (safety for rapid deaths)
+    if (this.deathFadeOverlay) {
+      this.app.stage.removeChild(this.deathFadeOverlay);
+      this.deathFadeOverlay.destroy();
+      this.deathFadeOverlay = null;
+    }
+
+    const overlay = new Graphics();
+    overlay.rect(0, 0, this.app.screen.width, this.app.screen.height);
+    overlay.fill({ color: 0xaa0000, alpha: 0 });
+    overlay.zIndex = 8999;
+    this.app.stage.addChild(overlay);
+    this.deathFadeOverlay = overlay;
+
+    await this.animateOverTime(durMs, (t) => {
+      overlay.clear();
+      let alpha: number;
+      let color: number;
+      if (t < 0.5) {
+        alpha = t * 2 * 0.7;
+        color = 0xaa0000;
+      } else {
+        alpha = 0.7 + (t - 0.5) * 2 * 0.3;
+        const redChannel = Math.floor((1 - (t - 0.5) * 2) * 0xaa);
+        color = redChannel << 16;
+      }
+      overlay.rect(0, 0, this.app.screen.width, this.app.screen.height);
+      overlay.fill({ color, alpha });
+    });
+  }
+
+  private computeRunStats(): {
+    timeSurvivedSec: number;
+    roomsReached: number;
+    monsterEncounters: number;
+  } {
+    const elapsedMs = performance.now() - this.state.runStats.startTimeMs;
+    return {
+      timeSurvivedSec: Math.floor(elapsedMs / 1000),
+      roomsReached: this.state.runStats.roomsReached.size,
+      monsterEncounters: this.state.runStats.monsterEncounters,
+    };
+  }
+
+  private showGameOverWithStats(stats: {
+    timeSurvivedSec: number;
+    roomsReached: number;
+    monsterEncounters: number;
+  }): void {
+    const statTime = document.getElementById("stat-time");
+    const statRooms = document.getElementById("stat-rooms");
+    const statEnc = document.getElementById("stat-encounters");
+    if (statTime) statTime.textContent = `${stats.timeSurvivedSec}s`;
+    if (statRooms) statRooms.textContent = `${stats.roomsReached}/4`;
+    if (statEnc) statEnc.textContent = String(stats.monsterEncounters);
+    document.getElementById("gameover-stats")?.classList.add("visible");
+  }
+
+  private hideGameOverStats(): void {
+    document.getElementById("gameover-stats")?.classList.remove("visible");
   }
 
   // ── Win flow ──
@@ -789,6 +982,9 @@ export class Game {
     this.app.ticker.remove(this.tick, this);
     this.clearTutorialTimers();
 
+    // Hide gameover stats
+    this.hideGameOverStats();
+
     // Remove end-screen overlay
     if (this.overlayContainer) {
       this.app.stage.removeChild(this.overlayContainer);
@@ -796,11 +992,28 @@ export class Game {
       this.overlayContainer = null;
     }
 
+    // Remove death fade overlay (prevents permanent black screen on restart)
+    if (this.deathFadeOverlay) {
+      this.app.stage.removeChild(this.deathFadeOverlay);
+      this.deathFadeOverlay.destroy();
+      this.deathFadeOverlay = null;
+    }
+
     // Clean up flashlight
     if (this.flashlight) {
       this.flashlight.destroy();
       this.flashlight = null;
     }
+
+    // Clean up vignette
+    if (this.vignette) {
+      this.app.stage.removeChild(this.vignette.container);
+      this.vignette.destroy();
+      this.vignette = null;
+    }
+
+    // Clean up heartbeat
+    this.heartbeat.destroy();
 
     // Clean up visibility listener
     if (this.visibilityHandler) {
@@ -1176,6 +1389,9 @@ export class Game {
           durationMs: 5000,
         });
         this.monster.addSuspicion(40);
+        if (audioManager.has("confused_growl")) {
+          audioManager.playOneShot("confused_growl");
+        }
       }
       // Mark as spent radio (visual floor prop)
       this.state.radio.spentRadios.push({

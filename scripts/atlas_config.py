@@ -81,6 +81,12 @@ ATLAS_PROFILES = {
         "frames": ["attack3", "howl1", "howl2"],
         "chroma_key": True,
     },
+    "monster_confused.png": {
+        "type": "character_strip",
+        "entity": "monster",
+        "frames": ["confused1", "confused2", "confused3", "confused4", "confused5", "confused6"],
+        "chroma_key": True,
+    },
 
     # ── Props (2D grid, 6 cols x 2 rows) ──────────────────────────────────
 

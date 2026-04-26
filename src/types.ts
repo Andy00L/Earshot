@@ -45,6 +45,12 @@ export interface HidingState {
   kind: HidingSpotKind | null;
 }
 
+export interface RunStats {
+  startTimeMs: number;
+  roomsReached: Set<RoomId>;
+  monsterEncounters: number;
+}
+
 export interface GameState {
   phase: GamePhase;
   currentRoom: RoomId;
@@ -53,6 +59,7 @@ export interface GameState {
   hasShownReceptionTutorial: boolean;
   hidingState: HidingState;
   radio: RadioState;
+  runStats: RunStats;
 }
 
 export function createInitialGameState(): GameState {
@@ -69,6 +76,11 @@ export function createInitialGameState(): GameState {
       collectedRadioIds: new Set(),
       droppedRadios: [],
       spentRadios: [],
+    },
+    runStats: {
+      startTimeMs: 0,
+      roomsReached: new Set<RoomId>(["reception"]),
+      monsterEncounters: 0,
     },
   };
 }

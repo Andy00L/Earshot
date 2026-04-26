@@ -170,7 +170,12 @@ export class Monster extends Container {
   public onStateChange: ((state: MonsterState) => void) | null = null;
 
   update(dt: number, dtMS: number): void {
-    this.advanceFrame(dtMS);
+    // Confused animation overrides normal frame cycling when lured
+    if (this.isLured) {
+      this.updateLureAnimation(dtMS);
+    } else {
+      this.advanceFrame(dtMS);
+    }
     this.stateTimer += dtMS;
 
     switch (this.state) {
@@ -379,6 +384,69 @@ export class Monster extends Container {
   private applySpriteAnchor(frameName: string): void {
     const meta = getFrameMeta(this.manifest, "monster", frameName);
     this.sprite.anchor.set(0.5, meta.baselineY / meta.height);
+  }
+
+  // ── Confused animation (lure state) ──
+
+  private confusedFrameNames: string[] = [];
+  private confusedFrameIdx = 0;
+  private confusedFrameTimer = 0;
+  private hasConfusedFrames = false;
+
+  /** Check if confused frames exist in the manifest. Call once after construction. */
+  loadConfusedFrames(): void {
+    const entry = this.manifest["monster"];
+    if (!entry || entry.type !== "character") return;
+    this.confusedFrameNames = Object.keys(entry.frames)
+      .filter((n) => n.startsWith("confused"))
+      .sort();
+    this.hasConfusedFrames = this.confusedFrameNames.length > 0;
+    if (this.hasConfusedFrames) {
+      console.info(
+        `[monster] confused frames loaded: ${this.confusedFrameNames.length}`,
+      );
+    }
+  }
+
+  /** Returns true when the monster is actively lured by radio bait. */
+  get isLured(): boolean {
+    return (
+      this.lureTargetX !== null && performance.now() < this.lureExpiresAt
+    );
+  }
+
+  updateLureAnimation(dtMs: number): void {
+    if (!this.isLured) {
+      // Clear tint/rotation when lure ends
+      this.sprite.tint = 0xffffff;
+      this.sprite.rotation = 0;
+      return;
+    }
+
+    if (this.hasConfusedFrames) {
+      this.confusedFrameTimer += dtMs;
+      if (this.confusedFrameTimer > 200) {
+        this.confusedFrameTimer = 0;
+        this.confusedFrameIdx =
+          (this.confusedFrameIdx + 1) % this.confusedFrameNames.length;
+        const frameName = this.confusedFrameNames[this.confusedFrameIdx];
+        this.applyFrame(frameName);
+      }
+    } else {
+      // Fallback: purple tint + slow rotation oscillation
+      this.sprite.tint = 0xaa88cc;
+      this.sprite.rotation = Math.sin(performance.now() / 300) * 0.05;
+    }
+  }
+
+  // ── Sprite scale access for death cinematic ──
+
+  get spriteScaleX(): number {
+    return Math.abs(this.sprite.scale.x);
+  }
+
+  setSpriteScale(s: number): void {
+    this.sprite.scale.set(this.facing * s, s);
   }
 
   override destroy(): void {

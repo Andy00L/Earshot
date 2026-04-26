@@ -257,6 +257,48 @@
         "height": 344,
         "baselineY": 343,
         "sourceAtlas": "monster-charge"
+      },
+      "confused1": {
+        "file": "assets/monster/confused1.png",
+        "width": 261,
+        "height": 587,
+        "baselineY": 586,
+        "sourceAtlas": "monster_confused"
+      },
+      "confused2": {
+        "file": "assets/monster/confused2.png",
+        "width": 325,
+        "height": 497,
+        "baselineY": 496,
+        "sourceAtlas": "monster_confused"
+      },
+      "confused3": {
+        "file": "assets/monster/confused3.png",
+        "width": 337,
+        "height": 374,
+        "baselineY": 373,
+        "sourceAtlas": "monster_confused"
+      },
+      "confused4": {
+        "file": "assets/monster/confused4.png",
+        "width": 390,
+        "height": 232,
+        "baselineY": 231,
+        "sourceAtlas": "monster_confused"
+      },
+      "confused5": {
+        "file": "assets/monster/confused5.png",
+        "width": 319,
+        "height": 562,
+        "baselineY": 561,
+        "sourceAtlas": "monster_confused"
+      },
+      "confused6": {
+        "file": "assets/monster/confused6.png",
+        "width": 318,
+        "height": 422,
+        "baselineY": 421,
+        "sourceAtlas": "monster_confused"
       }
     },
     "boundingBox": {

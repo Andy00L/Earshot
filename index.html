@@ -9,6 +9,124 @@
     body { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
     canvas { display: block; image-rendering: -webkit-optimize-contrast; }
 
+    /* Title screen */
+    #title-screen {
+      position: fixed;
+      inset: 0;
+      background: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+      cursor: pointer;
+      font-family: 'Courier New', monospace;
+      color: #d4d4d4;
+    }
+    #title-screen.hidden { display: none; }
+    #title-screen .title-content {
+      text-align: center;
+      padding: 64px;
+      background: rgba(0, 0, 0, 0.85);
+      border: 2px solid #444;
+    }
+    #title-screen .game-title {
+      font-size: 96px;
+      font-weight: bold;
+      letter-spacing: 16px;
+      margin: 0;
+      color: #fff;
+      text-shadow: 0 0 30px rgba(255, 60, 60, 0.4);
+      animation: glitch 4s infinite;
+    }
+    @keyframes glitch {
+      0%, 90%, 100% {
+        text-shadow: 0 0 30px rgba(255, 60, 60, 0.4);
+        transform: translate(0);
+      }
+      92% {
+        text-shadow: -2px 0 #ff0000, 2px 0 #00ffff;
+        transform: translate(-1px, 0);
+      }
+      94% {
+        text-shadow: 2px 0 #ff0000, -2px 0 #00ffff;
+        transform: translate(1px, 0);
+      }
+      96% {
+        text-shadow: 0 -2px #ff0000, 0 2px #00ffff;
+        transform: translate(0, -1px);
+      }
+    }
+    #title-screen .tagline {
+      font-size: 18px;
+      color: #aaa;
+      margin: 24px 0 48px 0;
+      letter-spacing: 4px;
+      font-style: italic;
+    }
+    #title-screen .start-prompt {
+      font-size: 14px;
+      color: #ff6060;
+      letter-spacing: 4px;
+      animation: pulse 1.5s infinite;
+    }
+    #title-screen .warning {
+      font-size: 11px;
+      color: #555;
+      margin-top: 32px;
+      letter-spacing: 2px;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 0.5; }
+      50% { opacity: 1; }
+    }
+
+    /* Gameover stats overlay */
+    #gameover-stats {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.85);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 900;
+      font-family: 'Courier New', monospace;
+      color: #d4d4d4;
+      pointer-events: none;
+    }
+    #gameover-stats.visible {
+      display: flex;
+      pointer-events: auto;
+    }
+    #gameover-stats .stats-content {
+      text-align: center;
+      padding: 48px;
+      border: 2px solid #aa3333;
+      background: #0a0a0a;
+      max-width: 400px;
+    }
+    #gameover-stats h1 {
+      font-size: 48px;
+      color: #ff3030;
+      letter-spacing: 8px;
+      margin: 0 0 32px 0;
+      text-shadow: 0 0 20px rgba(255, 0, 0, 0.6);
+    }
+    #gameover-stats .stat-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 16px;
+      padding: 8px 0;
+      border-bottom: 1px solid #333;
+    }
+    #gameover-stats .stat-label { color: #888; letter-spacing: 1px; }
+    #gameover-stats .stat-value { color: #fff; font-weight: bold; }
+    #gameover-stats .restart-prompt {
+      margin-top: 24px;
+      font-size: 13px;
+      color: #666;
+      letter-spacing: 2px;
+    }
+
     /* Radio ARM popup overlay */
     #radio-popup {
       position: fixed;
@@ -117,6 +235,27 @@
   </style>
 </head>
 <body>
+  <!-- Title screen -->
+  <div id="title-screen">
+    <div class="title-content">
+      <h1 class="game-title">EARSHOT</h1>
+      <div class="tagline">It can hear you. So can your microphone.</div>
+      <div class="start-prompt">Click anywhere to start</div>
+      <div class="warning">Headphones recommended. Quiet room required.</div>
+    </div>
+  </div>
+
+  <!-- Gameover stats overlay -->
+  <div id="gameover-stats">
+    <div class="stats-content">
+      <h1>YOU DIED</h1>
+      <div class="stat-row"><span class="stat-label">Time survived</span><span class="stat-value" id="stat-time">0s</span></div>
+      <div class="stat-row"><span class="stat-label">Rooms reached</span><span class="stat-value" id="stat-rooms">0/4</span></div>
+      <div class="stat-row"><span class="stat-label">Monster encounters</span><span class="stat-value" id="stat-encounters">0</span></div>
+      <div class="restart-prompt">Press R to restart</div>
+    </div>
+  </div>
+
   <!-- Radio ARM popup (HTML overlay, shown over PIXI canvas during PAUSED phase) -->
   <div id="radio-popup" class="radio-popup-hidden">
     <div class="radio-popup-content">
