@@ -1,5 +1,7 @@
 # Earshot Asset Pipeline
 
+[Back to main README](../README.md)
+
 Python pipeline that reads sprite atlases from `raw/`, chroma keys the green background, detects individual sprites via connected component labeling (CCL), and writes trimmed transparent PNGs to `assets/` with an `atlas.json` manifest for the game engine.
 
 Replaces the previous Node/sharp slicer (`slice.js`) which failed on atlases where action poses (claws, jaws, flashlight beams) extended across frame boundaries.
@@ -137,6 +139,7 @@ Pipeline orchestrator. For each atlas:
 | `monster-alert.png` | character_strip | monster | 6 (alert1-2, hunt1-4) | default |
 | `monster-charge.png` | character_strip | monster | 6 (charge1-4, attack1-2) | default |
 | `monster-attack.png` | character_strip | monster | 3 (attack3, howl1-2) | default |
+| `monster_confused.png` | character_strip | monster | 6 (confused1-6) | default |
 | `props.png` | props_grid | props | 12 (6x2 grid) | default |
 | `radio.png` | single_object | radio | 1 | (11, 5) |
 | `reception.png` | background | reception | 1 | n/a |
