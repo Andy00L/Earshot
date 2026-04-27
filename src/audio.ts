@@ -12,6 +12,7 @@ export class AudioManager {
   private currentAmbientHowl: Howl | null = null;
   private masterVolume: number = 1.0;
   private suspended: boolean = false;
+  private activeBlobs: Map<string, Howl> = new Map();
 
   async loadAll(onProgress?: (loaded: number, total: number) => void): Promise<void> {
     // Skip if already loaded (survives Game restart)
@@ -98,6 +99,12 @@ export class AudioManager {
     this.sounds.get(id)?.howl.stop();
   }
 
+  getDuration(id: AudioId): number {
+    const managed = this.sounds.get(id);
+    if (!managed) return 0;
+    return managed.howl.duration() * 1000;
+  }
+
   stopAllMonsterVocals(): void {
     for (const [id] of this.sounds) {
       if (AUDIO_CATALOG[id].category === "monster_vocal") {
@@ -118,21 +125,32 @@ export class AudioManager {
 
   /** Load and play audio from a blob URL (used for runtime TTS). */
   loadAndPlayBlob(id: string, blobUrl: string, opts?: { volume?: number }): void {
+    const cleanup = () => {
+      this.activeBlobs.delete(id);
+      howl.unload();
+      URL.revokeObjectURL(blobUrl);
+    };
     const howl = new Howl({
       src: [blobUrl],
       format: ["mp3"],
       volume: (opts?.volume ?? 1.0) * this.masterVolume,
-      onend: () => {
-        howl.unload();
-        URL.revokeObjectURL(blobUrl);
-      },
+      onend: cleanup,
       onloaderror: () => {
         console.warn(`[radio] Failed to decode TTS blob ${id}, cleaning up`);
-        howl.unload();
-        URL.revokeObjectURL(blobUrl);
+        cleanup();
       },
     });
+    this.activeBlobs.set(id, howl);
     howl.play();
+  }
+
+  /** Stop and unload all in-flight TTS blob sounds (call on restart/death). */
+  stopAllBlobs(): void {
+    for (const [, howl] of this.activeBlobs) {
+      howl.stop();
+      howl.unload();
+    }
+    this.activeBlobs.clear();
   }
 
   setMasterVolume(v: number): void {

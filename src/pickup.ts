@@ -10,7 +10,7 @@ export class Pickup {
   constructor(parent: Container, config: PickupConfig, floorY: number) {
     this.config = config;
 
-    const alias = "props:" + config.frame;
+    const alias = config.frame.includes(":") ? config.frame : "props:" + config.frame;
     const texture = Assets.get<Texture>(alias);
     if (!texture) {
       console.error(`Missing prop texture: ${alias}`);

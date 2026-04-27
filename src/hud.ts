@@ -1,22 +1,185 @@
-import { Container, Graphics, Text } from "pixi.js";
+import { Assets, Container, Graphics, Sprite, Text, Texture } from "pixi.js";
+import { InventorySlotItem, RoomId } from "./types";
+import { Minimap } from "./minimap";
 
 export class HUD {
   private container: Container;
   private msgBox: Container | null = null;
   private msgTimer = 0;
-  private suspicionBar: Graphics | null = null;
+  private beaconFrame: Sprite | null = null;
+  private beaconFill: Sprite | null = null;
+  private beaconFillMaxScaleX = 0;
+  private beaconErodedOverlay: Sprite | null = null;
+  private beaconMeterWidth = 0;
   private promptBox: Container | null = null;
   private currentPromptStr: string = "";
   private hiddenIndicator: Container | null = null;
   private radioIndicator: Container | null = null;
   private radioTimerBox: Container | null = null;
   private radioTimerText: Text | null = null;
+  private inventorySlotBgs: Sprite[] = [];
+  private inventorySlotIcons: Sprite[] = [];
+  private lastSlotState: string = "";
+  private subtitleContainer: Container;
+  private subtitleBg: Graphics;
+  private subtitleText: Text;
+  private subtitleHideTimer: ReturnType<typeof setTimeout> | null = null;
+  private minimap: Minimap;
 
   constructor(parent: Container) {
     this.container = new Container();
     this.container.zIndex = 5000;
     parent.sortableChildren = true;
     parent.addChild(this.container);
+    this.initBeaconMeter();
+    this.initInventorySlots();
+    this.initSubtitle();
+
+    this.minimap = new Minimap();
+    this.minimap.container.x = 1280 - 240 - 16;
+    this.minimap.container.y = 16;
+    this.container.addChild(this.minimap.container);
+  }
+
+  private initBeaconMeter(): void {
+    const frameTexture = Assets.get<Texture>("ui:beacon-meter-frame");
+    const fillTexture = Assets.get<Texture>("ui:beacon-meter-fill");
+    if (!frameTexture || !fillTexture) return;
+
+    const targetWidth = 200;
+    const frameScaleX = targetWidth / frameTexture.width;
+    const scaledFrameH = frameTexture.height * frameScaleX;
+    const meterY = Math.round(720 * 0.10) + 16; // ~88px from top (10% of 720 canvas + original offset)
+
+    // Fill behind frame, inset inside the frame's painted border
+    const FRAME_INSET_TOP_PCT = 0.18;
+    const FRAME_INSET_BOTTOM_PCT = 0.18;
+    const FRAME_INSET_LEFT_PCT = 0.05;
+    const FRAME_INSET_RIGHT_PCT = 0.05;
+    const interiorH = scaledFrameH * (1 - FRAME_INSET_TOP_PCT - FRAME_INSET_BOTTOM_PCT);
+    const interiorW = targetWidth * (1 - FRAME_INSET_LEFT_PCT - FRAME_INSET_RIGHT_PCT);
+
+    this.beaconFill = new Sprite(fillTexture);
+    this.beaconFill.anchor.set(0, 0.5);
+    this.beaconFillMaxScaleX = interiorW / fillTexture.width;
+    const fillScaleY = interiorH / fillTexture.height;
+    this.beaconFill.scale.set(this.beaconFillMaxScaleX, fillScaleY);
+    this.beaconFill.x = 640 - targetWidth / 2 + targetWidth * FRAME_INSET_LEFT_PCT;
+    this.beaconFill.y = meterY + scaledFrameH * FRAME_INSET_TOP_PCT + interiorH / 2;
+    this.container.addChild(this.beaconFill);
+
+    // Eroded overlay: dark region covering the right portion when maxBeacon < 100
+    this.beaconMeterWidth = interiorW;
+    this.beaconErodedOverlay = new Sprite(Texture.WHITE);
+    this.beaconErodedOverlay.tint = 0x111111;
+    this.beaconErodedOverlay.alpha = 0.7;
+    this.beaconErodedOverlay.anchor.set(1, 0.5);
+    this.beaconErodedOverlay.x = 640 - targetWidth / 2 + targetWidth * (1 - FRAME_INSET_RIGHT_PCT);
+    this.beaconErodedOverlay.y = meterY + scaledFrameH * FRAME_INSET_TOP_PCT + interiorH / 2;
+    this.beaconErodedOverlay.width = 0;
+    this.beaconErodedOverlay.height = interiorH;
+    this.container.addChild(this.beaconErodedOverlay);
+
+    // Frame on top as decoration
+    this.beaconFrame = new Sprite(frameTexture);
+    this.beaconFrame.anchor.set(0.5, 0);
+    this.beaconFrame.scale.set(frameScaleX);
+    this.beaconFrame.x = 640;
+    this.beaconFrame.y = meterY;
+    this.container.addChild(this.beaconFrame);
+
+    // BEACON label above the meter
+    const beaconLabel = new Text({
+      text: "BEACON",
+      style: {
+        fontFamily: "monospace",
+        fontSize: 14,
+        fill: 0xffffff,
+        align: "center",
+        fontWeight: "bold",
+      },
+    });
+    beaconLabel.alpha = 0.7;
+    beaconLabel.anchor.set(0.5, 1);
+    beaconLabel.x = 640;
+    beaconLabel.y = meterY - 4;
+    this.container.addChild(beaconLabel);
+  }
+
+  private initInventorySlots(): void {
+    const slotTex = Assets.get<Texture>("ui:inventory-slot-empty");
+    for (let i = 0; i < 3; i++) {
+      const bg = new Sprite(slotTex || Texture.WHITE);
+      bg.anchor.set(0, 0);
+      bg.x = 16 + i * 56;
+      bg.y = 16;
+      bg.scale.set(0.08);
+      this.container.addChild(bg);
+      this.inventorySlotBgs.push(bg);
+
+      const icon = new Sprite(Texture.WHITE);
+      icon.anchor.set(0.5, 0.5);
+      icon.x = 16 + i * 56 + 25;
+      icon.y = 16 + 26;
+      icon.visible = false;
+      this.container.addChild(icon);
+      this.inventorySlotIcons.push(icon);
+    }
+  }
+
+  private static slotItemAlias(item: InventorySlotItem): string {
+    if (item.kind === "material") {
+      const map: Record<string, string> = {
+        wire: "materials:wire",
+        glass_shards: "materials:glass",
+        battery: "materials:battery",
+        tape: "materials:tape",
+      };
+      return map[item.id];
+    }
+    if (item.kind === "crafted") {
+      const map: Record<string, string> = {
+        flare: "flare:unlit",
+        smoke_bomb: "smokebomb:idle",
+        decoy_radio: "decoy-radio:idle",
+      };
+      return map[item.id];
+    }
+    return "radio";
+  }
+
+  private static iconScale(item: InventorySlotItem): number {
+    if (item.kind === "radio") return 0.03;
+    return 0.07;
+  }
+
+  updateInventorySlots(
+    slots: (InventorySlotItem | null)[],
+    selectedSlot: number,
+  ): void {
+    // Quick dirty-check to avoid per-frame texture swaps
+    const key = slots.map((s) => (s ? `${s.kind}:${"id" in s ? s.id : "r"}` : "x")).join(",") + `:${selectedSlot}`;
+    if (key === this.lastSlotState) return;
+    this.lastSlotState = key;
+
+    const emptyTex = Assets.get<Texture>("ui:inventory-slot-empty");
+    const selTex = Assets.get<Texture>("ui:inventory-slot-selected");
+
+    for (let i = 0; i < 3; i++) {
+      this.inventorySlotBgs[i].texture =
+        (i === selectedSlot ? selTex : emptyTex) || Texture.WHITE;
+
+      const item = slots[i];
+      const icon = this.inventorySlotIcons[i];
+      if (!item) {
+        icon.visible = false;
+        continue;
+      }
+      icon.visible = true;
+      const alias = HUD.slotItemAlias(item);
+      icon.texture = Assets.get<Texture>(alias) || Texture.WHITE;
+      icon.scale.set(HUD.iconScale(item));
+    }
   }
 
   showMessage(text: string, durationMS: number = 2000): void {
@@ -63,36 +226,16 @@ export class HUD {
         this.clearMessage();
       }
     }
+    this.minimap.update(dtMS);
   }
 
-  updateSuspicionMeter(suspicion: number): void {
-    if (!this.suspicionBar) {
-      this.suspicionBar = new Graphics();
-      this.container.addChild(this.suspicionBar);
-    }
-
-    this.suspicionBar.clear();
-
-    const barWidth = 200;
-    const barHeight = 6;
-    const x = 640 - barWidth / 2;
-    const y = 16;
-
-    // Background
-    this.suspicionBar.rect(x, y, barWidth, barHeight).fill({ color: 0x333333, alpha: 0.5 });
-
-    // Fill
-    const fillWidth = (suspicion / 100) * barWidth;
-    if (fillWidth > 0) {
-      let color: number;
-      if (suspicion < 30) {
-        color = 0xcccccc;
-      } else if (suspicion < 60) {
-        color = 0xffaa00;
-      } else {
-        color = 0xff2200;
-      }
-      this.suspicionBar.rect(x, y, fillWidth, barHeight).fill({ color });
+  updateBeaconMeter(value: number, maxBeacon: number = 100): void {
+    if (!this.beaconFill) return;
+    const t = Math.max(0, Math.min(1, value / 100));
+    this.beaconFill.scale.x = this.beaconFillMaxScaleX * t;
+    if (this.beaconErodedOverlay) {
+      const erodedFraction = (100 - maxBeacon) / 100;
+      this.beaconErodedOverlay.width = erodedFraction * this.beaconMeterWidth;
     }
   }
 
@@ -224,6 +367,85 @@ export class HUD {
     }
   }
 
+  private initSubtitle(): void {
+    this.subtitleContainer = new Container();
+    this.subtitleContainer.alpha = 0;
+    this.subtitleContainer.zIndex = 5500;
+
+    this.subtitleBg = new Graphics();
+    this.subtitleContainer.addChild(this.subtitleBg);
+
+    this.subtitleText = new Text({
+      text: "",
+      style: {
+        fontFamily: "monospace",
+        fontSize: 22,
+        fill: 0xffffff,
+        align: "center",
+        wordWrap: true,
+        wordWrapWidth: 1080,
+      },
+    });
+    this.subtitleText.anchor.set(0.5, 0.5);
+    this.subtitleText.x = 640;
+    this.subtitleText.y = 600;
+    this.subtitleContainer.addChild(this.subtitleText);
+
+    this.container.addChild(this.subtitleContainer);
+  }
+
+  showSubtitle(text: string, durationMs: number): void {
+    if (this.subtitleHideTimer) clearTimeout(this.subtitleHideTimer);
+
+    this.subtitleText.text = text;
+
+    // Redraw bg to fit text
+    this.subtitleBg.clear();
+    const padding = 20;
+    const textBounds = this.subtitleText.getBounds();
+    const bgX = textBounds.x - padding;
+    const bgY = textBounds.y - padding;
+    const bgW = textBounds.width + padding * 2;
+    const bgH = textBounds.height + padding * 2;
+    this.subtitleBg.roundRect(bgX, bgY, bgW, bgH, 6);
+    this.subtitleBg.fill({ color: 0x000000, alpha: 0.7 });
+
+    this.subtitleContainer.alpha = 1;
+
+    this.subtitleHideTimer = setTimeout(() => {
+      this.fadeSubtitleOut();
+    }, durationMs);
+  }
+
+  hideSubtitle(): void {
+    if (this.subtitleHideTimer) {
+      clearTimeout(this.subtitleHideTimer);
+      this.subtitleHideTimer = null;
+    }
+    this.subtitleContainer.alpha = 0;
+  }
+
+  private fadeSubtitleOut(): void {
+    this.subtitleHideTimer = null;
+    const startTime = performance.now();
+    const fade = () => {
+      const elapsed = performance.now() - startTime;
+      const t = Math.min(elapsed / 300, 1);
+      this.subtitleContainer.alpha = 1 - t;
+      if (t < 1) requestAnimationFrame(fade);
+    };
+    fade();
+  }
+
+  updateMinimap(currentRoom: RoomId, hasMapFragment: boolean): void {
+    this.minimap.onRoomEnter(currentRoom);
+    if (hasMapFragment) {
+      this.minimap.show();
+    } else {
+      this.minimap.hide();
+    }
+  }
+
   private clearMessage(): void {
     if (this.msgBox) {
       this.container.removeChild(this.msgBox);
@@ -235,12 +457,27 @@ export class HUD {
   destroy(): void {
     this.clearMessage();
     this.clearPrompt();
+    this.hideSubtitle();
+    this.minimap.destroy();
     this.setHiddenVisible(false);
     this.showRadioInventory(false);
     this.clearRadioTimer();
-    if (this.suspicionBar) {
-      this.suspicionBar.destroy();
-      this.suspicionBar = null;
+    this.inventorySlotBgs.forEach((s) => s.destroy());
+    this.inventorySlotBgs = [];
+    this.inventorySlotIcons.forEach((s) => s.destroy());
+    this.inventorySlotIcons = [];
+    this.lastSlotState = "";
+    if (this.beaconErodedOverlay) {
+      this.beaconErodedOverlay.destroy();
+      this.beaconErodedOverlay = null;
+    }
+    if (this.beaconFill) {
+      this.beaconFill.destroy();
+      this.beaconFill = null;
+    }
+    if (this.beaconFrame) {
+      this.beaconFrame.destroy();
+      this.beaconFrame = null;
     }
     this.container.parent?.removeChild(this.container);
     this.container.destroy({ children: true });

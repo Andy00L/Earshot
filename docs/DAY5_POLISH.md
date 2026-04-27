@@ -14,13 +14,13 @@ Procedural Web Audio API heartbeat. Two-thump lub-dub pattern via sine oscillato
 Black border overlay that tightens based on monster threat. PIXI Graphics rectangles on all four edges. Intensity: ATTACK=0.30, CHARGE=0.45, HUNT=0.65, ALERT=0.85, default=1.0. Layered at zIndex=150 (above flashlight, below HUD).
 
 ### 4. Extended Death Sequence
-Death flow extended from instant to ~2.2 seconds. Sequence: (1) death thud + heavy screen shake, (2) monster loom animation (400ms, scale up 1.15x), (3) close growl SFX, (4) red-then-black screen fade (1500ms), (5) gameover stats overlay.
+Death flow extended from instant to ~4.7 seconds. Sequence: (1) death thud + heavy screen shake, (2) monster loom animation (400ms, scale up 1.15x), (3) close growl SFX, (4) red-then-black screen fade (1500ms), (5) gameover stats overlay with `gameover.png` background (2.5s or press R), (6) respawn at Reception with shade drop.
 
 ### 5. Death Stats Screen
-HTML overlay showing time survived, rooms reached (out of 4), and monster encounters. Stats tracked via `GameState.runStats`. Encounters increment on each HUNT transition. Rooms tracked via Set on room transitions. Styled with monospace font and red accents.
+HTML overlay showing time survived, rooms reached (out of 5), and monster encounters. Background image `gameover.png` rendered behind stats at 50% opacity with `object-fit: contain`. Stats tracked via `GameState.runStats`. Encounters increment on each HUNT transition. Rooms tracked via Set on room transitions. Styled with monospace font and red accents. Overlay at z-index 1100 (above radio popup).
 
 ### 6. Title Screen
-HTML overlay with EARSHOT title (CSS glitch animation), tagline, click-to-start prompt, and headphones warning. Ambient drone via Web Audio (sawtooth 55Hz + sine 82.4Hz). Title screen blocks game initialization until user clicks, satisfying browser autoplay policy.
+HTML overlay with EARSHOT title (CSS glitch animation), tagline, click-to-start prompt, and headphones warning. Procedural ambient drone via Web Audio starts after first click: sawtooth oscillator at 55Hz (gain 0.08) and sine oscillator at 82.4Hz (gain 0.06), mixed through a master gain of 0.25. Drone stops when asset loading completes. Title screen click satisfies browser autoplay policy by calling `Howler.ctx.resume()`.
 
 ### 7. Tutorial Radio
 Two seconds after game start, auto-fires ElevenLabs TTS: "If you can hear this, get out. It hunts by sound. Stay quiet. Stay hidden." HUD shows "INCOMING TRANSMISSION". Falls back to static_burst SFX on TTS failure. Only plays once per session via `tutorialPlayed` flag.

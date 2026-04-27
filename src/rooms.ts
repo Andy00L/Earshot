@@ -1,12 +1,13 @@
 import { Container } from "pixi.js";
 import { Room } from "./room";
-import { RoomId, RoomDefinition, DoorConfig } from "./types";
+import { RoomId, RoomDefinition, DoorConfig, VentDef, JumperHotspot } from "./types";
 
 // Room dimensions from atlas.json:
 // reception: 2896 x 1086
 // cubicles:  3344 x 941
 // server:    3344 x 941
 // stairwell: 3344 x 941
+// archives:  2044 x 769
 
 export const ROOM_DEFINITIONS: Record<RoomId, RoomDefinition> = {
   reception: {
@@ -17,13 +18,44 @@ export const ROOM_DEFINITIONS: Record<RoomId, RoomDefinition> = {
     monsterPatrolPath: [0, 0],
     playerSpawnFromLeft: 200,
     playerSpawnFromRight: 2750,
-    pickups: [],
+    pickups: [
+      {
+        id: "tape",
+        room: "reception",
+        x: 2000,
+        y: -40,
+        frame: "materials:tape",
+        pickupRange: 100,
+      },
+      {
+        id: "tape_01",
+        room: "reception",
+        x: 2400,
+        y: -20,
+        frame: "shade-tape:recorder",
+        pickupRange: 100,
+      },
+    ],
     doors: [
       {
         fromRoom: "reception",
         toRoom: "cubicles",
-        fromX: 2796,
+        fromX: 500,
         toX: 150,
+        requirement: "press_e",
+      },
+      {
+        fromRoom: "reception",
+        toRoom: "server",
+        fromX: 1800,
+        toX: 1672,
+        requirement: "press_e",
+      },
+      {
+        fromRoom: "reception",
+        toRoom: "archives",
+        fromX: 2700,
+        toX: 200,
         requirement: "press_e",
       },
     ],
@@ -44,7 +76,15 @@ export const ROOM_DEFINITIONS: Record<RoomId, RoomDefinition> = {
         scale: 0.7,
         flickerAnimation: true,
       },
+      {
+        id: "workbench_recep",
+        frameName: "workbench:bench",
+        x: 1500,
+        y: 999,
+        scale: 0.4,
+      },
     ],
+    workbench: { x: 1500, triggerWidth: 100 },
   },
 
   cubicles: {
@@ -64,13 +104,29 @@ export const ROOM_DEFINITIONS: Record<RoomId, RoomDefinition> = {
         frame: "keycard",
         pickupRange: 100,
       },
+      {
+        id: "glass_shards",
+        room: "cubicles",
+        x: 900,
+        y: 0,
+        frame: "materials:glass",
+        pickupRange: 100,
+      },
+      {
+        id: "tape_02",
+        room: "cubicles",
+        x: 2700,
+        y: -20,
+        frame: "shade-tape:recorder",
+        pickupRange: 100,
+      },
     ],
     doors: [
       {
         fromRoom: "cubicles",
         toRoom: "reception",
         fromX: 100,
-        toX: 2700,
+        toX: 500,
         requirement: "press_e",
       },
       {
@@ -92,8 +148,24 @@ export const ROOM_DEFINITIONS: Record<RoomId, RoomDefinition> = {
       { id: "exit_sign_cub", frameName: "exit-sign", x: 3300, y: 350, scale: 0.5, alpha: 0.8 },
       { id: "radio_table_cub", frameName: "radio-table", x: 1800, y: 866, scale: 0.5 },
     ],
+    foregroundProps: [
+      { key: "cubicle-dividers:straight", x: 500, anchorBottomY: 866 },
+      { key: "cubicle-dividers:l-corner", x: 1000, anchorBottomY: 866 },
+      { key: "cubicle-dividers:half-height", x: 1400, anchorBottomY: 866 },
+      { key: "cubicle-dividers:straight-damaged", x: 1900, anchorBottomY: 866 },
+      { key: "cubicle-dividers:gap", x: 2250, anchorBottomY: 866 },
+      { key: "cubicle-dividers:l-corner-damaged", x: 2600, anchorBottomY: 866 },
+      { key: "cubicle-dividers:straight", x: 3050, anchorBottomY: 866 },
+    ],
     radioPickups: [
       { radioId: "radio_cub", x: 1800, y: 866, pickupRange: 100 },
+    ],
+    vents: [
+      { x: 3100, target: "stairwell", targetX: 200 },
+    ],
+    jumperHotspots: [
+      { x: 1200, ventY: 100 },
+      { x: 2400, ventY: 100 },
     ],
   },
 
@@ -114,6 +186,22 @@ export const ROOM_DEFINITIONS: Record<RoomId, RoomDefinition> = {
         frame: "breaker-off",
         pickupRange: 100,
         togglesTo: "breaker-on",
+      },
+      {
+        id: "wire",
+        room: "server",
+        x: 2100,
+        y: 0,
+        frame: "materials:wire",
+        pickupRange: 100,
+      },
+      {
+        id: "tape_03",
+        room: "server",
+        x: 600,
+        y: -20,
+        frame: "shade-tape:recorder",
+        pickupRange: 100,
       },
     ],
     doors: [
@@ -146,6 +234,18 @@ export const ROOM_DEFINITIONS: Record<RoomId, RoomDefinition> = {
     radioPickups: [
       { radioId: "radio_server", x: 2200, y: 866, pickupRange: 100 },
     ],
+    jumperHotspots: [
+      { x: 1800, ventY: 100, floorLevel: "upper" },
+      { x: 2700, ventY: 100 },
+    ],
+    // Upper floor (two-story Server room)
+    upperBg: "server-upper",
+    upperFloorY: 486,
+    upperFloorXMin: 800,
+    upperFloorXMax: 2900,
+    ladders: [
+      { x: 1400, bottomY: 866, topY: 486, triggerWidth: 60 },
+    ],
   },
 
   stairwell: {
@@ -156,7 +256,16 @@ export const ROOM_DEFINITIONS: Record<RoomId, RoomDefinition> = {
     monsterPatrolPath: [600, 2800],
     playerSpawnFromLeft: 150,
     playerSpawnFromRight: 3194,
-    pickups: [],
+    pickups: [
+      {
+        id: "tape_06",
+        room: "stairwell",
+        x: 2400,
+        y: -20,
+        frame: "shade-tape:recorder",
+        pickupRange: 100,
+      },
+    ],
     doors: [
       {
         fromRoom: "stairwell",
@@ -181,6 +290,74 @@ export const ROOM_DEFINITIONS: Record<RoomId, RoomDefinition> = {
     decorativeProps: [
       { id: "exit_sign_stairwell", frameName: "exit-sign", x: 2700, y: 350, scale: 0.7, alpha: 0.9 },
     ],
+    vents: [
+      { x: 200, target: "cubicles", targetX: 3100 },
+    ],
+    jumperHotspots: [
+      { x: 1500, ventY: 100 },
+      { x: 2700, ventY: 100 },
+    ],
+    whispererCanSpawn: true,
+    whispererSpawnChance: 0.40,
+  },
+
+  archives: {
+    id: "archives",
+    background: "archives",
+    hasMonster: false,
+    monsterSpawn: 0,
+    monsterPatrolPath: [0, 0],
+    playerSpawnFromLeft: 200,
+    playerSpawnFromRight: 1900,
+    pickups: [
+      {
+        id: "battery",
+        room: "archives",
+        x: 1200,
+        y: 0,
+        frame: "materials:battery",
+        pickupRange: 100,
+      },
+      {
+        id: "map_fragment",
+        room: "archives",
+        x: 2000,
+        y: 0,
+        frame: "materials:keycard",
+        pickupRange: 100,
+      },
+      {
+        id: "tape_04",
+        room: "archives",
+        x: 1700,
+        y: -20,
+        frame: "shade-tape:recorder",
+        pickupRange: 100,
+      },
+      {
+        id: "tape_05",
+        room: "archives",
+        x: 400,
+        y: -20,
+        frame: "shade-tape:recorder",
+        pickupRange: 100,
+      },
+    ],
+    doors: [
+      {
+        fromRoom: "archives",
+        toRoom: "reception",
+        fromX: 200,
+        toX: 2700,
+        requirement: "press_e",
+      },
+    ],
+    hidingSpots: [
+      { id: "desk_arch_1", kind: "desk", x: 1500, y: 708, triggerWidth: 80 },
+    ],
+    decorativeProps: [],
+    beaconDrainMultiplier: 1.5,
+    whispererCanSpawn: true,
   },
 };
 
@@ -214,6 +391,25 @@ export class RoomManager {
       const dist = Math.abs(playerX - door.fromX);
       if (dist <= DOOR_RANGE && dist < closestDist) {
         closest = door;
+        closestDist = dist;
+      }
+    }
+
+    return closest;
+  }
+
+  getNearbyVent(playerX: number): VentDef | null {
+    const VENT_RANGE = 80;
+    const vents = this.currentDef.vents;
+    if (!vents) return null;
+
+    let closest: VentDef | null = null;
+    let closestDist = Infinity;
+
+    for (const vent of vents) {
+      const dist = Math.abs(playerX - vent.x);
+      if (dist <= VENT_RANGE && dist < closestDist) {
+        closest = vent;
         closestDist = dist;
       }
     }

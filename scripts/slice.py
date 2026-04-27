@@ -31,6 +31,29 @@ RAW = ROOT / "raw"
 ASSETS = ROOT / "assets"
 
 
+# ── File discovery ───────────────────────────────────────────────────────
+
+
+def _discover_raw_files() -> dict[str, Path]:
+    """
+    Scan raw/ recursively and return a mapping from basename to full path.
+    Raises if two files in different subdirectories share the same basename,
+    since ATLAS_PROFILES keys are basenames.
+    """
+    by_name: dict[str, Path] = {}
+    for p in RAW.rglob("*.png"):
+        name = p.name
+        if name in by_name:
+            raise RuntimeError(
+                f"Duplicate basename '{name}' found at:\n"
+                f"  {by_name[name]}\n"
+                f"  {p}\n"
+                f"Profile keys must be unique basenames."
+            )
+        by_name[name] = p
+    return by_name
+
+
 # ── Component merging ─────────────────────────────────────────────────────
 
 
@@ -254,6 +277,113 @@ def _handle_props_grid(
     }
 
 
+def _handle_fixed_cell_strip(
+    filename: str, profile: dict, src_path: Path, debug: bool,
+) -> dict:
+    """Chroma key a sheet and slice into N equal horizontal cells."""
+    entity = profile["entity"]
+    expected_frames = profile["frames"]
+    frame_count = profile["frame_count"]
+    source_atlas = Path(filename).stem
+
+    if len(expected_frames) != frame_count:
+        print(f"    ERROR: frame_count={frame_count} but {len(expected_frames)} "
+              f"frame names in {filename}")
+        return {}
+
+    img_pil = Image.open(src_path).convert("RGB")
+    rgb = np.array(img_pil)
+    rgba = chroma_key_hsv(rgb)
+    height, width = rgba.shape[:2]
+
+    entity_dir = ASSETS / entity
+    entity_dir.mkdir(parents=True, exist_ok=True)
+
+    frames = {}
+    for i in range(frame_count):
+        name = expected_frames[i]
+        x_start = round(i * width / frame_count)
+        x_end = round((i + 1) * width / frame_count)
+
+        cell = rgba[:, x_start:x_end].copy()
+        pil = Image.fromarray(cell)
+        bbox = pil.getbbox()
+
+        if bbox is None:
+            print(f"    ERROR: empty cell {i} ({name}) in {filename}")
+            return {}
+
+        pil = pil.crop(bbox)
+        w_out, h_out = pil.width, pil.height
+
+        alpha = np.array(pil)[:, :, 3]
+        nonzero_rows = np.where(alpha.any(axis=1))[0]
+        baseline_y = int(nonzero_rows[-1]) if len(nonzero_rows) > 0 else h_out - 1
+
+        out_path = entity_dir / f"{name}.png"
+        pil.save(out_path, "PNG")
+
+        frames[name] = {
+            "file": f"assets/{entity}/{name}.png",
+            "width": w_out,
+            "height": h_out,
+            "baselineY": baseline_y,
+            "sourceAtlas": source_atlas,
+        }
+
+    return {
+        "type": "fixed_cell_strip",
+        "entity": entity,
+        "frames": frames,
+    }
+
+
+def _handle_single_chroma(
+    filename: str, profile: dict, src_path: Path, debug: bool,
+) -> dict:
+    """Chroma key (or passthrough) a single sprite without CCL detection."""
+    entity = profile["entity"]
+    name = profile["frames"][0]
+    use_chroma = profile.get("chroma_key", True)
+
+    if use_chroma:
+        rgb = np.array(Image.open(src_path).convert("RGB"))
+        rgba = chroma_key_hsv(rgb)
+        pil = Image.fromarray(rgba)
+    else:
+        pil = Image.open(src_path).convert("RGBA")
+
+    bbox = pil.getbbox()
+    if bbox:
+        pil = pil.crop(bbox)
+
+    if pil.width == 0 or pil.height == 0:
+        print(f"    ERROR: empty image after crop in {filename}")
+        return {}
+
+    entity_dir = ASSETS / entity
+    entity_dir.mkdir(parents=True, exist_ok=True)
+    out_path = entity_dir / f"{name}.png"
+    pil.save(out_path, "PNG")
+
+    alpha = np.array(pil)[:, :, 3]
+    nonzero_rows = np.where(alpha.any(axis=1))[0]
+    baseline_y = int(nonzero_rows[-1]) if len(nonzero_rows) > 0 else pil.height - 1
+
+    return {
+        "type": "single_chroma",
+        "entity": entity,
+        "frames": {
+            name: {
+                "file": f"assets/{entity}/{name}.png",
+                "width": pil.width,
+                "height": pil.height,
+                "baselineY": baseline_y,
+            }
+        },
+    }
+
+
 # ── Frame/tile saving ────────────────────────────────────────────────────
 
 
@@ -381,7 +511,7 @@ def build_atlas_json(per_atlas_results: dict) -> dict:
         rtype = result["type"]
         entity = result["entity"]
 
-        if rtype == "character_strip":
+        if rtype in ("character_strip", "fixed_cell_strip", "single_chroma"):
             if entity not in char_frames:
                 char_frames[entity] = {}
             char_frames[entity].update(result["frames"])
@@ -469,19 +599,81 @@ def build_preview_html(atlas_data: dict, output_path: Path) -> None:
     output_path.write_text("\n".join(lines), encoding="utf-8")
 
 
+# ── Atlas integrity guard ────────────────────────────────────────────────
+
+
+def _verify_atlas_integrity(atlas_data: dict) -> bool:
+    """
+    Verify every entry in atlas.json has a corresponding valid PNG on disk.
+    Returns True if all checks pass, False otherwise.
+    """
+    errors = []
+    total_frames = 0
+
+    for entity, entry in sorted(atlas_data.items()):
+        etype = entry.get("type")
+
+        if etype == "character":
+            for name, meta in entry["frames"].items():
+                fpath = ROOT / meta["file"]
+                if not fpath.exists():
+                    errors.append(f"  MISSING: {meta['file']}")
+                else:
+                    try:
+                        Image.open(fpath).verify()
+                    except Exception as e:
+                        errors.append(f"  CORRUPT: {meta['file']}: {e}")
+                total_frames += 1
+
+        elif etype == "tileset":
+            for name, meta in entry["tiles"].items():
+                fpath = ROOT / meta["file"]
+                if not fpath.exists():
+                    errors.append(f"  MISSING: {meta['file']}")
+                else:
+                    try:
+                        Image.open(fpath).verify()
+                    except Exception as e:
+                        errors.append(f"  CORRUPT: {meta['file']}: {e}")
+                total_frames += 1
+
+        elif etype == "single":
+            fpath = ROOT / entry["file"]
+            if not fpath.exists():
+                errors.append(f"  MISSING: {entry['file']}")
+            else:
+                try:
+                    Image.open(fpath).verify()
+                except Exception as e:
+                    errors.append(f"  CORRUPT: {entry['file']}: {e}")
+            total_frames += 1
+
+    if errors:
+        print("\nATLAS INTEGRITY CHECK FAILED:")
+        for e in errors:
+            print(e)
+        return False
+
+    print(f"\nAtlas integrity: {len(atlas_data)} entities, "
+          f"{total_frames} frames verified, all OK")
+    return True
+
+
 # ── Main ──────────────────────────────────────────────────────────────────
 
 
-def slice_atlas(filename: str, debug: bool = False) -> dict:
+def slice_atlas(
+    filename: str, raw_files: dict[str, Path], debug: bool = False,
+) -> dict:
     """Process one atlas. Returns metadata dict for atlas.json."""
     profile = ATLAS_PROFILES.get(filename)
     if not profile:
         print(f"  SKIP: no profile for {filename}")
         return {}
 
-    src_path = RAW / filename
-    if not src_path.exists():
-        print(f"  ERROR: {src_path} does not exist")
+    src_path = raw_files.get(filename)
+    if not src_path or not src_path.exists():
+        print(f"  ERROR: {filename} not found in raw/ (searched recursively)")
         return {}
 
     atlas_type = profile["type"]
@@ -495,6 +687,10 @@ def slice_atlas(filename: str, debug: bool = False) -> dict:
         return _handle_character_strip(filename, profile, src_path, debug)
     elif atlas_type == "props_grid":
         return _handle_props_grid(filename, profile, src_path, debug)
+    elif atlas_type == "fixed_cell_strip":
+        return _handle_fixed_cell_strip(filename, profile, src_path, debug)
+    elif atlas_type == "single_chroma":
+        return _handle_single_chroma(filename, profile, src_path, debug)
     else:
         print(f"  ERROR: unknown type {atlas_type}")
         return {}
@@ -511,11 +707,12 @@ def main():
 
     if args.clean:
         for item in ASSETS.iterdir():
-            if item.is_dir() and item.name != "_debug":
+            if item.is_dir() and item.name not in ("_debug", "audio"):
                 shutil.rmtree(item)
             elif item.is_file() and item.name not in ("atlas.json", "preview.html"):
                 item.unlink()
 
+    raw_files = _discover_raw_files()
     targets = [args.only] if args.only else sorted(ATLAS_PROFILES.keys())
 
     print("\nEarshot asset pipeline (Python/CCL)")
@@ -523,13 +720,31 @@ def main():
 
     per_atlas_results = {}
     for filename in targets:
-        result = slice_atlas(filename, debug=args.debug)
+        result = slice_atlas(filename, raw_files, debug=args.debug)
         if result:
             per_atlas_results[filename] = result
 
     atlas_data = build_atlas_json(per_atlas_results)
 
     atlas_json_path = ASSETS / "atlas.json"
+
+    # When using --only, merge into existing atlas to prevent partial overwrite
+    if args.only and atlas_json_path.exists():
+        existing = json.loads(atlas_json_path.read_text(encoding="utf-8"))
+        for entity, data in atlas_data.items():
+            if (data["type"] == "character"
+                    and entity in existing
+                    and existing[entity].get("type") == "character"):
+                # Merge frames into existing character entity
+                existing[entity]["frames"].update(data["frames"])
+                frames = existing[entity]["frames"]
+                max_w = max(f["width"] for f in frames.values())
+                max_h = max(f["height"] for f in frames.values())
+                existing[entity]["boundingBox"] = {"width": max_w, "height": max_h}
+            else:
+                existing[entity] = data
+        atlas_data = existing
+
     atlas_json_path.write_text(
         json.dumps(atlas_data, indent=2), encoding="utf-8",
     )
@@ -539,11 +754,24 @@ def main():
     build_preview_html(atlas_data, preview_path)
     print(f"Wrote {preview_path}")
 
-    # Summary
-    total_frames = sum(
-        len(r.get("frames", {})) for r in per_atlas_results.values()
-    )
-    print(f"\nTotal: {len(per_atlas_results)} atlases, {total_frames} frames/tiles")
+    # Per-entity summary
+    total_frames = 0
+    for entity, entry in sorted(atlas_data.items()):
+        etype = entry.get("type")
+        if etype == "character":
+            n = len(entry.get("frames", {}))
+        elif etype == "tileset":
+            n = len(entry.get("tiles", {}))
+        else:
+            n = 1
+        total_frames += n
+        print(f"  {entity}: {n} frames")
+
+    print(f"\nTotal: {len(atlas_data)} entities, {total_frames} frames/tiles")
+
+    # Atlas integrity guard
+    if not _verify_atlas_integrity(atlas_data):
+        sys.exit(1)
 
 
 if __name__ == "__main__":

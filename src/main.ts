@@ -1,51 +1,50 @@
 import { Application } from 'pixi.js';
+import { Howler } from 'howler';
 import { loadGameAssets } from './assets';
 import { Game } from './game';
 
-function startAmbientDrone(): { stop: () => Promise<void> } {
-  try {
-    const ctx = new (window.AudioContext ||
-      (window as unknown as { webkitAudioContext: typeof AudioContext })
-        .webkitAudioContext)();
-    const osc1 = ctx.createOscillator();
-    const osc2 = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc1.type = "sawtooth";
-    osc1.frequency.value = 55;
-    osc2.type = "sine";
-    osc2.frequency.value = 82.4;
-    gain.gain.value = 0.05;
-    osc1.connect(gain);
-    osc2.connect(gain);
-    gain.connect(ctx.destination);
-    osc1.start();
-    osc2.start();
-    let stopped = false;
-    return {
-      stop: async () => {
-        if (stopped) return;
-        stopped = true;
-        try {
-          // Ramp gain to 0 to avoid audio click
-          const now = ctx.currentTime;
-          gain.gain.cancelScheduledValues(now);
-          gain.gain.setValueAtTime(gain.gain.value, now);
-          gain.gain.linearRampToValueAtTime(0, now + 0.05);
-          // Stop oscillators after ramp
-          osc1.stop(now + 0.06);
-          osc2.stop(now + 0.06);
-          // Wait for stop, then disconnect and close
-          await new Promise((r) => setTimeout(r, 100));
-          gain.disconnect();
-          await ctx.close();
-        } catch (err) {
-          console.warn("[ambient drone] cleanup warning:", err);
-        }
-      },
-    };
-  } catch {
-    return { stop: async () => {} };
+// Procedural title drone (sawtooth 55Hz + sine 82.4Hz).
+// Starts after the user's first click (satisfies autoplay policy).
+// https://developer.chrome.com/blog/autoplay
+let titleDroneNodes: { oscs: OscillatorNode[]; gain: GainNode } | null = null;
+
+function startTitleDrone(): void {
+  const ctx = Howler.ctx;
+  if (!ctx) return;
+
+  const gain = ctx.createGain();
+  gain.gain.value = 0.25;
+  gain.connect(ctx.destination);
+
+  const saw = ctx.createOscillator();
+  saw.type = "sawtooth";
+  saw.frequency.value = 55;
+  const sawGain = ctx.createGain();
+  sawGain.gain.value = 0.08;
+  saw.connect(sawGain);
+  sawGain.connect(gain);
+  saw.start();
+
+  const sine = ctx.createOscillator();
+  sine.type = "sine";
+  sine.frequency.value = 82.4;
+  const sineGain = ctx.createGain();
+  sineGain.gain.value = 0.06;
+  sine.connect(sineGain);
+  sineGain.connect(gain);
+  sine.start();
+
+  titleDroneNodes = { oscs: [saw, sine], gain };
+}
+
+function stopTitleDrone(): void {
+  if (!titleDroneNodes) return;
+  for (const osc of titleDroneNodes.oscs) {
+    osc.stop();
+    osc.disconnect();
   }
+  titleDroneNodes.gain.disconnect();
+  titleDroneNodes = null;
 }
 
 function showTitleScreen(): Promise<void> {
@@ -57,13 +56,18 @@ function showTitleScreen(): Promise<void> {
     }
     titleEl.classList.remove("hidden");
 
-    const ambientCtrl = startAmbientDrone();
-
     const onClick = async () => {
       titleEl.removeEventListener("click", onClick);
+
+      // Resume AudioContext per browser autoplay policy
+      if (Howler.ctx && Howler.ctx.state !== "running") {
+        try { await Howler.ctx.resume(); } catch { /* user disabled audio */ }
+      }
+
+      // Start procedural drone after user gesture
+      startTitleDrone();
+
       titleEl.classList.add("hidden");
-      // Fully stop drone and close its AudioContext before proceeding
-      await ambientCtrl.stop();
       resolve();
     };
 
@@ -93,8 +97,12 @@ function showTitleScreen(): Promise<void> {
     manifest = await loadGameAssets();
   } catch (e) {
     console.error('Failed to load game assets:', e);
+    stopTitleDrone();
     return;
   }
+
+  // Stop title drone before game audio takes over
+  stopTitleDrone();
 
   const game = new Game(app, manifest);
   await game.start();

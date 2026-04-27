@@ -103,6 +103,23 @@ async function generate(asset: AudioAsset): Promise<Buffer> {
     });
     return await streamToBuffer(stream);
   }
+  if (asset.category === "whisperer_voice" || asset.category === "lore_tape") {
+    const voiceId = asset.voiceId ?? "EXAVITQu4vr4xnSDxMaL";
+    const modelId = asset.modelId ?? "eleven_turbo_v2_5";
+    const vs = asset.voiceSettings;
+    const stream = await c.textToSpeech.convert(voiceId, {
+      text: asset.prompt,
+      modelId,
+      outputFormat: "mp3_44100_128",
+      voiceSettings: vs ? {
+        stability: vs.stability,
+        similarityBoost: vs.similarity_boost,
+        style: vs.style,
+        useSpeakerBoost: vs.use_speaker_boost,
+      } : undefined,
+    });
+    return await streamToBuffer(stream);
+  }
   // Sound Effects API (monster vocals + SFX)
   const stream = await c.textToSoundEffects.convert({
     text: asset.prompt,

@@ -14,6 +14,11 @@ export class Input {
 
   constructor() {
     this.onKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
+        return;
+      }
+
       if (MOVEMENT_KEYS.has(e.key)) {
         e.preventDefault();
       }
@@ -43,6 +48,14 @@ export class Input {
     return this.held.has('d') || this.held.has('D') || this.held.has('ArrowRight');
   }
 
+  isUp(): boolean {
+    return this.held.has('w') || this.held.has('W') || this.held.has('ArrowUp');
+  }
+
+  isDown(): boolean {
+    return this.held.has('s') || this.held.has('S') || this.held.has('ArrowDown');
+  }
+
   isRunning(): boolean {
     return this.held.has('Shift');
   }
@@ -69,6 +82,14 @@ export class Input {
   /** Returns true on the single frame G was first pressed (throw radio). */
   justThrew(): boolean {
     return this.justPressed("KeyG");
+  }
+
+  /** Returns the inventory slot selected this frame (0, 1, 2) or -1 if none. */
+  justSelectedSlot(): number {
+    if (this.justPressed("Digit1")) return 0;
+    if (this.justPressed("Digit2")) return 1;
+    if (this.justPressed("Digit3")) return 2;
+    return -1;
   }
 
   /** Clear all held/pressed state (used after resuming from PAUSED). */

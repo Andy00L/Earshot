@@ -3,6 +3,7 @@ import {
   Container,
   Ticker,
   Sprite,
+  TilingSprite,
   Graphics,
   Text,
   Assets,
@@ -16,11 +17,19 @@ import {
   MonsterState,
   ArmedRadio,
   RadioPickupDef,
+  VentDef,
+  JumperHotspot,
+  MaterialId,
+  CraftedItemId,
+  InventorySlotItem,
+  LoreTapeId,
+  isLoreTapeId,
+  LadderDef,
 } from "./types";
 import { Manifest } from "./assets";
 import { Player } from "./player";
 import { Monster } from "./monster";
-import { RoomManager } from "./rooms";
+import { RoomManager, ROOM_DEFINITIONS } from "./rooms";
 import { HUD } from "./hud";
 import { Input } from "./input";
 import { fadeTransition } from "./transition";
@@ -29,19 +38,38 @@ import { HidingSpot } from "./hiding";
 import { audioManager } from "./audio";
 import { micAnalyser } from "./mic";
 import { suspicionDeltaForFrame } from "./suspicion";
+import {
+  BeaconState,
+  createBeaconState,
+  classifyVoiceBand,
+  updateBeacon,
+  suspicionMultiplierForBand,
+  RMS_THRESHOLD_WHISPER,
+  RMS_THRESHOLD_NORMAL,
+  RMS_THRESHOLD_SHOUT,
+} from "./beacon";
 import { Flashlight } from "./flashlight";
-import { AmbientId } from "./audio-catalog";
+import { Jumper } from "./jumper";
+import { Whisperer } from "./whisperer";
+import { AmbientId, AudioId, LORE_TAPE_TRANSCRIPTS, MAP_FRAGMENT_TRANSCRIPT, TUTORIAL_TRANSCRIPTS } from "./audio-catalog";
 import { RadioPopup } from "./radio-popup";
 import { synthesizeTTS } from "./tts";
 import { ScreenShake } from "./screen-shake";
 import { Heartbeat } from "./heartbeat";
 import { Vignette } from "./vignette";
+import { RECIPES, craft } from "./crafting";
+import { Projectile } from "./projectile";
+import { FlareEffect } from "./flare-effect";
+import { SmokeBombEffect } from "./smokebomb-effect";
+import { DecoyEffect } from "./decoy-effect";
+import { WorkbenchMenu } from "./workbench-menu";
+import { ShadeVisual } from "./shade";
 
 // Survives Game restart (audio stays loaded, mic stays active)
 let audioInitialized = false;
 
-// Tutorial plays once per browser session, not per run
-let tutorialPlayedThisSession = false;
+// localStorage key: set after all 4 tutorials complete; skips on future runs
+const TUTORIAL_SEEN_KEY = "earshot.tutorialSeen";
 
 export class Game {
   private app: Application;
@@ -57,15 +85,41 @@ export class Game {
   private pickups: Pickup[] = [];
   private hidingSpots: HidingSpot[] = [];
   private decorativeSprites: Sprite[] = [];
+  private ventSprites: Sprite[] = [];
+  private doorSprites: Sprite[] = [];
   private flickerTimers: { sprite: Sprite; timer: number; nextAt: number }[] = [];
   private flashlight: Flashlight | null = null;
+  private jumpers: Jumper[] = [];
+  private jumperDripSprites: Sprite[] = [];
+  private whisperer: Whisperer | null = null;
+  private whispererSpawnCheckTimer = 0;
+  private static readonly WHISPERER_SPAWN_CHECK_INTERVAL_MS = 5000;
+  private static readonly WHISPERER_SPAWN_PROBABILITY = 0.30;
 
   // Radio bait system
+  private beaconState: BeaconState = createBeaconState();
   private radioPopup: RadioPopup;
+  private workbenchMenu: WorkbenchMenu;
+
+  // Crafting projectile/effect systems
+  private projectiles: Projectile[] = [];
+  private flareEffects: FlareEffect[] = [];
+  private smokeBombEffects: SmokeBombEffect[] = [];
+  private decoyEffects: DecoyEffect[] = [];
   private armedRadioSprites: Map<string, Sprite> = new Map();
   private droppedRadioSprites: Map<string, Sprite> = new Map();
   private spentRadioSprites: Map<string, Sprite> = new Map();
   private armedRadioAborts: Map<string, AbortController> = new Map();
+
+  // Foreground layer (dividers that render above the player for occlusion)
+  private foregroundLayer!: Container;
+
+  // Upper floor state (Server room ladder system)
+  private playerFloorYOverride: number | null = null;
+  private playerClimbingLadder: LadderDef | null = null;
+  private ladderSprites: Sprite[] = [];
+  private upperBgSprite: Sprite | null = null;
+  private upperCatwalkSprite: TilingSprite | null = null;
 
   // Desk-hide charge roll state (reset when monster leaves CHARGE or player exits hide)
   private deskChargeRolled = false;
@@ -85,13 +139,37 @@ export class Game {
   // Death fade overlay (tracked for cleanup on restart)
   private deathFadeOverlay: Graphics | null = null;
 
+  // Shade death-drop system
+  private shadeVisual: ShadeVisual | null = null;
+  private deathSnapshot: {
+    slots: (InventorySlotItem | null)[];
+    x: number;
+    y: number;
+    room: RoomId;
+  } | null = null;
+
   // Footstep SFX timing
   private footstepTimer = 0;
+
+  // Dark agitation state (Beacon=0 screams)
+  private darkScreamTimer = 0;
+  private darkScreamInterval = 0;
   private static readonly FOOTSTEP_WALK_MS = 400;
   private static readonly FOOTSTEP_RUN_MS = 250;
 
+  // Dark agitation: scream pool when Beacon=0
+  private static readonly DARK_SCREAM_IDS: AudioId[] = [
+    "monster_alert_growl",
+    "monster_hunt_screech",
+    "monster_charge_roar",
+    "monster_attack_lunge",
+    "monster_idle_howl",
+  ];
+
   // Tutorial message timers (cleared on death/win/restart)
   private tutorialTimers: ReturnType<typeof setTimeout>[] = [];
+  private tutorialT0Queued = false;
+  private tutorialT1Queued = false;
 
   // Visibility change cleanup
   private visibilityHandler: (() => void) | null = null;
@@ -100,11 +178,14 @@ export class Game {
     this.app = app;
     this.manifest = manifest;
     this.state = createInitialGameState();
+    this.state.loadedLockers = this.rollLockerJumpers();
     this.radioPopup = new RadioPopup();
+    this.workbenchMenu = new WorkbenchMenu();
   }
 
   async start(): Promise<void> {
     this.world = new Container();
+    this.world.sortableChildren = true;
     this.app.stage.addChild(this.world);
 
     this.rooms = new RoomManager(this.world, "reception");
@@ -114,10 +195,16 @@ export class Game {
       this.app.screen.height - this.rooms.currentRoom.roomHeight;
 
     this.player = new Player(this.manifest);
+    this.player.zIndex = 50;
     this.player.setRoomWidth(this.rooms.currentRoom.roomWidth);
     this.player.x = this.rooms.currentDef.playerSpawnFromLeft;
     this.player.y = this.rooms.currentRoom.floorY;
     this.world.addChild(this.player);
+
+    // Foreground layer renders above player (cubicle dividers, etc.)
+    this.foregroundLayer = new Container();
+    this.foregroundLayer.zIndex = 80;
+    this.world.addChild(this.foregroundLayer);
 
     // Reception has no monster
     this.monster = null;
@@ -126,8 +213,13 @@ export class Game {
     this.hud = new HUD(this.app.stage);
 
     // Create room-specific props for reception
+    this.createDoors();
     this.createDecorativeProps();
+    this.createForegroundProps();
+    this.createLadderAndUpperFloor();
     this.createHidingSpots();
+    this.createVents();
+    this.createJumpers();
     this.createRadioWorldSprites();
 
     // Lock gameplay until audio loaded and user clicks
@@ -180,13 +272,7 @@ export class Game {
     this.state.runStats.startTimeMs = performance.now();
 
     this.maybeShowReceptionTutorial();
-
-    // Tutorial radio: 2 seconds after start (once per session)
-    if (!tutorialPlayedThisSession) {
-      this.tutorialTimers.push(
-        setTimeout(() => this.playTutorialTransmission(), 2000),
-      );
-    }
+    this.maybePlayTutorialT0();
   }
 
   // ── Audio initialization (first launch only) ──
@@ -306,11 +392,48 @@ export class Game {
     this.input.endFrame();
   }
 
+  /** Returns the player's effective floor Y (upper floor override or room ground). */
+  private currentFloorY(): number {
+    return this.playerFloorYOverride ?? this.rooms.currentRoom.floorY;
+  }
+
+  private static readonly CLIMB_SPEED = 2.0; // px per frame
+
   private handlePlayingTick(dt: number, dtMS: number): void {
     if (this.locked) return;
 
-    this.player.update(dt, this.input);
+    // Ladder climbing state overrides normal player movement
+    if (this.playerClimbingLadder) {
+      this.handleClimbing(dt);
+    } else {
+      this.player.update(dt, this.input);
+      // Clamp player to upper floor X bounds if on upper floor
+      if (this.playerFloorYOverride !== null) {
+        const def = this.rooms.currentDef;
+        if (def.upperFloorXMin !== undefined && def.upperFloorXMax !== undefined) {
+          this.player.x = Math.max(def.upperFloorXMin, Math.min(def.upperFloorXMax, this.player.x));
+        }
+        // Check if player walks onto a ladder from the upper floor
+        this.checkLadderEntryFromUpper();
+      } else {
+        // Check if player walks onto a ladder from ground floor (press Up/W)
+        this.checkLadderEntryFromGround();
+      }
+    }
     this.monster?.update(dt, dtMS);
+
+    // Update Jumpers
+    const playerCrouched = this.player.isCrouching();
+    const playerOnUpper = this.playerFloorYOverride !== null;
+    for (const jumper of this.jumpers) {
+      jumper.update(dtMS, this.player.x, this.player.y, playerCrouched, playerOnUpper);
+      if (jumper.isPlayerCaught(this.player.x, this.player.y)) {
+        this.triggerDeath();
+      }
+    }
+
+    // Update Whisperer
+    this.updateWhisperer(dtMS);
 
     // Apply suspicion decay with crouch/hiding multiplier
     if (this.monster) {
@@ -321,22 +444,71 @@ export class Game {
       this.monster.applyDecay(dtMS, decayMult);
     }
 
-    // Mic-driven suspicion
+    // Voice-driven beacon and suspicion
+    const rms = micAnalyser.state === "active" ? micAnalyser.sample() : 0;
+    const band = classifyVoiceBand(rms, {
+      whisper: RMS_THRESHOLD_WHISPER,
+      normal: RMS_THRESHOLD_NORMAL,
+      shout: RMS_THRESHOLD_SHOUT,
+    });
+    const drainMult = this.rooms.currentDef.beaconDrainMultiplier ?? 1.0;
+    updateBeacon(this.beaconState, band, dtMS, drainMult);
+
     if (this.monster && micAnalyser.state === "active") {
-      const rms = micAnalyser.sample();
       const delta = suspicionDeltaForFrame(rms, dtMS);
-      this.monster.addSuspicion(delta);
+      let mult = suspicionMultiplierForBand(band);
+      // Smoke bomb dampening: 30% rate while player is inside smoke
+      if (this.smokeBombEffects.some((sb) => sb.containsPlayer(this.player.x, this.player.y))) {
+        mult *= 0.3;
+      }
+      this.monster.addSuspicion(delta * mult);
     }
+
+    // Dark agitation: passive suspicion bleed and monster screams at Beacon=0
+    if (this.beaconState.value <= 0) {
+      if (this.monster) {
+        this.monster.addSuspicion(5 * (dtMS / 1000));
+      }
+      if (this.darkScreamInterval === 0) {
+        this.darkScreamInterval = 2000 + Math.random() * 2000;
+      }
+      this.darkScreamTimer += dtMS;
+      if (this.darkScreamTimer >= this.darkScreamInterval) {
+        this.playDarkScream();
+        this.darkScreamTimer = 0;
+        this.darkScreamInterval = 2000 + Math.random() * 2000;
+      }
+    } else {
+      this.darkScreamTimer = 0;
+      this.darkScreamInterval = 0;
+    }
+
+    // Inventory slot selection (1/2/3 keys)
+    const slotPick = this.input.justSelectedSlot();
+    if (slotPick !== -1) this.state.selectedSlot = slotPick;
 
     // Radio: arm (R key) and throw (G key)
     if (this.input.justArmedRadio()) {
       this.armCarriedRadio();
     }
     if (this.input.justThrew()) {
-      this.throwCarriedArmedRadio();
+      const hasArmedRadio = this.state.radio.armedRadios.some(
+        (r) => !r.thrown && r.roomId === this.state.currentRoom,
+      );
+      if (hasArmedRadio) {
+        this.throwCarriedArmedRadio();
+      } else {
+        this.throwSelectedItem();
+      }
     }
     this.updateArmedRadios(dtMS);
     this.syncArmedRadioSprites();
+
+    // Update crafted-item projectiles and effects
+    this.updateProjectiles(dtMS);
+    this.updateFlareEffects(dtMS);
+    this.updateSmokeBombEffects(dtMS);
+    this.updateDecoyEffects(dtMS);
 
     // Hiding prompts and movement-exit (also shows radio pickup prompts)
     this.updateHidingPrompts();
@@ -350,6 +522,11 @@ export class Game {
     this.screenShake.update(dtMS);
     this.world.x += this.screenShake.offsetX;
     this.world.y += this.screenShake.offsetY;
+
+    // Update shade visual position (follows world camera)
+    if (this.shadeVisual) {
+      this.shadeVisual.update(dtMS, this.world.x, this.world.y);
+    }
 
     // Heartbeat scales with suspicion
     this.heartbeat.setSuspicion(this.monster?.suspicion ?? 0);
@@ -374,18 +551,42 @@ export class Game {
       }
     }
 
-    // Flashlight follows player screen position
+    // Flashlight follows player screen position, radius and brightness driven by beacon
     if (this.flashlight) {
+      this.flashlight.setBeaconVisuals(this.beaconState.visionRadius, this.beaconState.visionBrightness);
       const screenX = this.player.x + this.world.x;
       const screenY = this.player.y + this.world.y;
       this.flashlight.update(screenX, screenY);
     }
 
-    // Suspicion meter
-    this.hud.updateSuspicionMeter(this.monster?.suspicion ?? 0);
+    // Beacon meter
+    this.hud.updateBeaconMeter(this.beaconState.value, this.beaconState.maxBeacon);
 
-    // Radio HUD
-    this.hud.showRadioInventory(this.state.radio.carriedRadioId !== null);
+    // Tutorial triggers
+    // T1: queue on first movement input in reception
+    if (!this.state.tutorialPlayed.t1 && this.state.currentRoom === "reception" &&
+        (this.input.isLeft() || this.input.isRight())) {
+      this.maybeQueueTutorialT1();
+    }
+    // T2 early trigger: beacon drops below 70
+    if (this.state.tutorialPlayed.t1 && !this.state.tutorialPlayed.t2 &&
+        this.beaconState.value < 70) {
+      this.playTutorialT2();
+    }
+    // T3 early trigger: player near workbench (within 150px)
+    if (this.state.tutorialPlayed.t2 && !this.state.tutorialPlayed.t3 &&
+        this.state.currentRoom === "reception") {
+      const wb = ROOM_DEFINITIONS.reception.workbench;
+      if (wb && Math.abs(this.player.x - wb.x) < 150) {
+        this.playTutorialT3();
+      }
+    }
+
+    // Minimap
+    this.hud.updateMinimap(this.state.currentRoom, this.state.hasMapFragment);
+
+    // Inventory slots HUD
+    this.hud.updateInventorySlots(this.state.inventorySlots, this.state.selectedSlot);
     const activeArmed = this.state.radio.armedRadios.find(
       (r) => r.roomId === this.state.currentRoom && r.remainingMs > 0,
     );
@@ -393,6 +594,16 @@ export class Game {
       this.hud.showRadioTimer(activeArmed.remainingMs, activeArmed.thrown);
     } else {
       this.hud.clearRadioTimer();
+    }
+  }
+
+  // ── Dark agitation SFX (Beacon=0) ──
+
+  private playDarkScream(): void {
+    const ids = Game.DARK_SCREAM_IDS;
+    const id = ids[Math.floor(Math.random() * ids.length)];
+    if (audioManager.has(id)) {
+      audioManager.playOneShot(id);
     }
   }
 
@@ -484,15 +695,84 @@ export class Game {
           audioManager.playOneShot("breaker_switch");
         }
       } else {
-        // Collect pickup (keycard)
-        pickup.collect();
-        this.state.inventory.add(pickup.config.id);
-        if (pickup.config.id === "keycard") {
-          this.hud.showMessage("Picked up keycard.");
+        // Collect pickup
+        const pickupId = pickup.config.id;
+
+        // Lore tapes: play audio + subtitle, do not add to inventory
+        if (isLoreTapeId(pickupId)) {
+          pickup.collect();
+          this.state.tapesCollected.add(pickupId);
+          this.playLoreTape(pickupId);
+          return;
+        }
+
+        const isMaterial =
+          pickupId === "wire" ||
+          pickupId === "glass_shards" ||
+          pickupId === "battery" ||
+          pickupId === "tape";
+
+        if (isMaterial) {
+          // Route materials to inventory slots
+          const emptySlot = this.state.inventorySlots.indexOf(null);
+          if (emptySlot === -1) {
+            this.hud.showMessage("Inventory full.", 2000);
+            return;
+          }
+          pickup.collect();
+          this.state.inventory.add(pickupId); // track for respawn
+          this.state.inventorySlots[emptySlot] = {
+            kind: "material",
+            id: pickupId as MaterialId,
+          };
+          const name = pickupId.replace(/_/g, " ");
+          this.hud.showMessage(`Picked up ${name}.`);
           audioManager.playOneShot("keycard_pickup");
+        } else {
+          // Quest items (keycard, map_fragment)
+          pickup.collect();
+          this.state.inventory.add(pickupId);
+          if (pickupId === "keycard") {
+            this.hud.showMessage("Picked up keycard.");
+            audioManager.playOneShot("keycard_pickup");
+          } else if (pickupId === "map_fragment") {
+            this.state.hasMapFragment = true;
+            this.hud.showMessage("Picked up map fragment.");
+            audioManager.playOneShot("keycard_pickup");
+            // Phase 9D Issue 1: TTS narration on map_fragment pickup.
+            // Reuses Phase 7 lore tape pattern (playOneShot + subtitle).
+            this.playMapFragmentNarration();
+          } else {
+            const name = pickupId.replace(/_/g, " ");
+            this.hud.showMessage(`Picked up ${name}.`);
+            audioManager.playOneShot("keycard_pickup");
+          }
         }
       }
       return; // E press consumed
+    }
+
+    // Check workbench
+    if (this.isNearWorkbench()) {
+      this.openWorkbench();
+      return;
+    }
+
+    // Shade recovery
+    if (this.shadeVisual && this.state.activeShade &&
+        this.shadeVisual.isPlayerInRange(this.player.x, this.player.y)) {
+      this.recoverShade();
+      return;
+    }
+
+    // Vents and doors are ground-floor only
+    if (this.playerFloorYOverride !== null) return;
+
+    const vent = this.rooms.getNearbyVent(this.player.x);
+    if (vent) {
+      audioManager.playOneShot("door_open_creak");
+      this.transitionToRoom(vent.target, vent.targetX);
+      return;
     }
 
     // Check doors
@@ -586,16 +866,7 @@ export class Game {
         if (this.state.phase !== "PLAYING") return;
         this.hud.showMessage("Press E or Up to interact.", 4000);
       }, 4500),
-      setTimeout(() => {
-        if (this.state.phase !== "PLAYING") return;
-        this.hud.showMessage("It can hear you. Whisper.", 5000);
-      }, 9000),
     );
-
-    // Play radio intro voiceover if the asset loaded successfully
-    if (audioManager.has("radio_intro")) {
-      audioManager.playOneShot("radio_intro");
-    }
   }
 
   private clearTutorialTimers(): void {
@@ -603,27 +874,140 @@ export class Game {
     this.tutorialTimers = [];
   }
 
-  private async playTutorialTransmission(): Promise<void> {
-    if (tutorialPlayedThisSession) return;
-    if (this.state.phase !== "PLAYING") return;
-    tutorialPlayedThisSession = true;
+  // ── Voice tutorial (T0/T1/T2/T3) ──
 
-    this.hud.showMessage("INCOMING TRANSMISSION", 4000);
-
+  private shouldSkipVoiceTutorial(): boolean {
+    // Skip if localStorage flag set (returning player)
     try {
-      const result = await synthesizeTTS(
-        "If you can hear this, get out. It hunts by sound. Stay quiet. Stay hidden.",
-      );
-      audioManager.loadAndPlayBlob("tutorial_transmission", result.blobUrl, {
-        volume: 0.9,
-      });
-    } catch (err) {
-      console.warn("[tutorial] TTS failed, falling back to static_burst:", err);
-      if (audioManager.has("static_burst")) {
-        audioManager.playOneShot("static_burst");
-      }
-      this.hud.showMessage("TRANSMISSION CORRUPTED", 3000);
+      if (localStorage.getItem(TUTORIAL_SEEN_KEY) === "true") return true;
+    } catch { /* localStorage unavailable */ }
+    // Skip if player already collected a lore tape this run
+    if (this.state.tapesCollected.size > 0) return true;
+    return false;
+  }
+
+  /** Called from start() to play the opening transmission. */
+  private maybePlayTutorialT0(): void {
+    if (this.state.tutorialPlayed.t0) return;
+    if (this.shouldSkipVoiceTutorial()) return;
+
+    this.tutorialT0Queued = true;
+    this.tutorialTimers.push(
+      setTimeout(() => this.playTutorialT0(), 1500),
+    );
+  }
+
+  private playTutorialT0(): void {
+    if (this.state.tutorialPlayed.t0) return;
+    if (this.state.phase !== "PLAYING") return;
+    this.state.tutorialPlayed.t0 = true;
+
+    audioManager.playOneShot("tutorial_t0");
+    const dur = audioManager.getDuration("tutorial_t0") || 6000;
+    this.hud.showSubtitle(TUTORIAL_TRANSCRIPTS.tutorial_t0, dur);
+
+    // Chain T1 after T0 finishes + 2 seconds
+    this.tutorialTimers.push(
+      setTimeout(() => this.playTutorialT1(), dur + 2000),
+    );
+  }
+
+  /** Called from handlePlayingTick on first movement input in reception. */
+  private maybeQueueTutorialT1(): void {
+    if (this.tutorialT1Queued) return;
+    if (this.state.tutorialPlayed.t1) return;
+    if (this.tutorialT0Queued) return; // T0 chain will schedule T1
+    if (this.shouldSkipVoiceTutorial()) return;
+    if (this.state.currentRoom !== "reception") return;
+
+    this.tutorialT1Queued = true;
+    this.tutorialTimers.push(
+      setTimeout(() => this.playTutorialT1(), 2000),
+    );
+  }
+
+  private playTutorialT1(): void {
+    if (this.state.tutorialPlayed.t1) return;
+    if (this.state.phase !== "PLAYING") return;
+    this.state.tutorialPlayed.t1 = true;
+
+    audioManager.playOneShot("tutorial_t1");
+    const dur = audioManager.getDuration("tutorial_t1") || 8000;
+    this.hud.showSubtitle(TUTORIAL_TRANSCRIPTS.tutorial_t1, dur);
+
+    // Schedule T2 after T1 finishes + 10 seconds
+    this.tutorialTimers.push(
+      setTimeout(() => this.playTutorialT2(), dur + 10000),
+    );
+  }
+
+  private playTutorialT2(): void {
+    if (this.state.tutorialPlayed.t2) return;
+    if (this.state.phase !== "PLAYING") return;
+    this.state.tutorialPlayed.t2 = true;
+
+    audioManager.playOneShot("tutorial_t2");
+    const dur = audioManager.getDuration("tutorial_t2") || 8000;
+    this.hud.showSubtitle(TUTORIAL_TRANSCRIPTS.tutorial_t2, dur);
+
+    // Schedule T3 after T2 finishes + 10 seconds
+    this.tutorialTimers.push(
+      setTimeout(() => this.playTutorialT3(), dur + 10000),
+    );
+  }
+
+  private playTutorialT3(): void {
+    if (this.state.tutorialPlayed.t3) return;
+    if (this.state.phase !== "PLAYING") return;
+    this.state.tutorialPlayed.t3 = true;
+
+    audioManager.playOneShot("tutorial_t3");
+    const dur = audioManager.getDuration("tutorial_t3") || 8000;
+    this.hud.showSubtitle(TUTORIAL_TRANSCRIPTS.tutorial_t3, dur);
+
+    // Mark tutorials as seen in localStorage
+    try {
+      localStorage.setItem(TUTORIAL_SEEN_KEY, "true");
+    } catch { /* localStorage unavailable */ }
+  }
+
+  // ── Lore tape playback ──
+
+  private playLoreTape(tapeId: LoreTapeId): void {
+    this.stopAllNarrations();
+    audioManager.playOneShot(tapeId);
+    const durationMs = audioManager.getDuration(tapeId) || 8000;
+    const transcript = LORE_TAPE_TRANSCRIPTS[tapeId];
+    this.hud.showSubtitle(transcript, durationMs);
+  }
+
+  private playMapFragmentNarration(): void {
+    // Map fragment narration takes priority over any in-progress narration.
+    this.stopAllNarrations();
+
+    if (!audioManager.has("tape_map_fragment")) {
+      // Audio asset not available (generation failed or not loaded).
+      // Degrade to subtitle-only so the pickup is not blocked.
+      this.hud.showSubtitle(MAP_FRAGMENT_TRANSCRIPT, 8000);
+      return;
     }
+
+    audioManager.playOneShot("tape_map_fragment");
+    const durationMs = audioManager.getDuration("tape_map_fragment") || 8000;
+    // +500ms tail so the text lingers slightly past the audio end.
+    this.hud.showSubtitle(MAP_FRAGMENT_TRANSCRIPT, durationMs + 500);
+  }
+
+  /** Stop all lore tape and map-fragment narration audio, clear subtitle. */
+  private stopAllNarrations(): void {
+    const ids: AudioId[] = [
+      "tape_01", "tape_02", "tape_03", "tape_04", "tape_05", "tape_06",
+      "tape_map_fragment",
+    ];
+    for (const id of ids) {
+      audioManager.stop(id);
+    }
+    this.hud.hideSubtitle();
   }
 
   // ── Room transitions ──
@@ -662,9 +1046,19 @@ export class Game {
       // Populate new room
       this.createPickups();
       this.createMonster();
+      this.createDoors();
       this.createDecorativeProps();
+      this.createForegroundProps();
+      this.createLadderAndUpperFloor();
       this.createHidingSpots();
+      this.createVents();
+      this.createJumpers();
       this.createRadioWorldSprites();
+      this.maybeCreateShadeVisual();
+
+      // Reset upper floor state on room change
+      this.playerFloorYOverride = null;
+      this.playerClimbingLadder = null;
 
       // Crossfade ambient to new room
       const ambientId = `${toRoom}_ambient` as AmbientId;
@@ -691,6 +1085,52 @@ export class Game {
     this.decorativeSprites = [];
     this.flickerTimers = [];
 
+    // Foreground layer children (cubicle dividers, etc.)
+    this.foregroundLayer.removeChildren();
+
+    // Upper floor sprites (ladder, upper bg)
+    this.ladderSprites.forEach((s) => {
+      s.parent?.removeChild(s);
+      s.destroy();
+    });
+    this.ladderSprites = [];
+    if (this.upperBgSprite) {
+      this.upperBgSprite.parent?.removeChild(this.upperBgSprite);
+      this.upperBgSprite.destroy();
+      this.upperBgSprite = null;
+    }
+    if (this.upperCatwalkSprite) {
+      this.upperCatwalkSprite.parent?.removeChild(this.upperCatwalkSprite);
+      this.upperCatwalkSprite.destroy();
+      this.upperCatwalkSprite = null;
+    }
+
+    this.ventSprites.forEach((s) => {
+      s.parent?.removeChild(s);
+      s.destroy();
+    });
+    this.ventSprites = [];
+
+    this.doorSprites.forEach((s) => {
+      s.parent?.removeChild(s);
+      s.destroy();
+    });
+    this.doorSprites = [];
+
+    this.jumpers.forEach((j) => j.destroy());
+    this.jumpers = [];
+    this.jumperDripSprites.forEach((s) => {
+      s.parent?.removeChild(s);
+      s.destroy();
+    });
+    this.jumperDripSprites = [];
+
+    if (this.whisperer) {
+      this.whisperer.destroy();
+      this.whisperer = null;
+    }
+    this.whispererSpawnCheckTimer = 0;
+
     if (this.monster) {
       this.world.removeChild(this.monster);
       this.monster.destroy();
@@ -708,6 +1148,22 @@ export class Game {
 
     // Clean up radio sprites (armed, dropped, spent) for old room
     this.destroyRadioSprites();
+
+    // Clean up crafting projectiles and effects
+    this.projectiles.forEach((p) => p.destroy());
+    this.projectiles = [];
+    this.flareEffects.forEach((f) => f.destroy());
+    this.flareEffects = [];
+    this.smokeBombEffects.forEach((s) => s.destroy());
+    this.smokeBombEffects = [];
+    this.decoyEffects.forEach((d) => d.destroy());
+    this.decoyEffects = [];
+
+    // Clean up shade visual (data persists on gameState)
+    if (this.shadeVisual) {
+      this.shadeVisual.destroy();
+      this.shadeVisual = null;
+    }
   }
 
   private createPickups(): void {
@@ -715,6 +1171,8 @@ export class Game {
     for (const pc of def.pickups) {
       // Skip collected non-toggle pickups
       if (!pc.togglesTo && this.state.inventory.has(pc.id)) continue;
+      // Skip collected lore tapes (persist across deaths)
+      if (isLoreTapeId(pc.id) && this.state.tapesCollected.has(pc.id)) continue;
 
       const pickup = new Pickup(
         this.world,
@@ -765,6 +1223,14 @@ export class Game {
     this.state.phase = "DYING";
     this.locked = true;
 
+    // Capture inventory for shade before any cleanup
+    this.deathSnapshot = {
+      slots: this.state.inventorySlots.map(s => s ? { ...s } : null),
+      x: this.player.x,
+      y: this.player.y,
+      room: this.state.currentRoom,
+    };
+
     // Clear hiding state if dying while hidden (desk 50/50 caught)
     if (this.state.hidingState.active) {
       const spot = this.hidingSpots.find(
@@ -778,8 +1244,14 @@ export class Game {
     }
 
     this.clearTutorialTimers();
+    this.stopAllNarrations();
+    if (this.whisperer) {
+      this.whisperer.destroy();
+      this.whisperer = null;
+    }
     this.player.startCaughtSequence();
     audioManager.stopAllMonsterVocals();
+    audioManager.stopAllBlobs();
     audioManager.playOneShot("death_thud");
     this.screenShake.trigger(800, 20);
 
@@ -823,13 +1295,16 @@ export class Game {
     // Stop heartbeat
     this.heartbeat.stop();
 
-    // Compute stats and show gameover
+    // Layer 4: show gameover overlay with stats for 2.5s or until R pressed
     const stats = this.computeRunStats();
     this.showGameOverWithStats(stats);
-    if (this.flashlight) this.flashlight.setVisible(false);
-    audioManager.fadeOutAmbient();
-    this.state.phase = "GAMEOVER";
-    this.locked = false;
+    // Dismiss radio popup if it was open during death
+    document.getElementById("radio-popup")?.classList.add("radio-popup-hidden");
+    await this.waitForDismissOrTimeout(2500);
+    this.hideGameOverStats();
+
+    // Respawn at reception
+    await this.respawnAtReception();
   }
 
   private animateOverTime(
@@ -846,6 +1321,28 @@ export class Game {
         else resolve();
       };
       tick();
+    });
+  }
+
+  /** Wait until either timeout or R key is pressed. */
+  private waitForDismissOrTimeout(timeoutMs: number): Promise<void> {
+    return new Promise((resolve) => {
+      let resolved = false;
+      const timer = setTimeout(() => {
+        if (resolved) return;
+        resolved = true;
+        window.removeEventListener("keydown", onKey);
+        resolve();
+      }, timeoutMs);
+      const onKey = (e: KeyboardEvent) => {
+        if (e.code === "KeyR" && !resolved) {
+          resolved = true;
+          clearTimeout(timer);
+          window.removeEventListener("keydown", onKey);
+          resolve();
+        }
+      };
+      window.addEventListener("keydown", onKey);
     });
   }
 
@@ -881,6 +1378,174 @@ export class Game {
     });
   }
 
+  private async respawnAtReception(): Promise<void> {
+    // MAP FRAGMENT AND MINIMAP PERSIST THROUGH DEATH BY DESIGN (Phase 9D Issue 2, decision A).
+    // hasMapFragment stays true, minimap stays visible, visited rooms stay in the Set.
+    // Knowledge is permanent. Death costs time and inventory, not information.
+    // If the design changes, the fix is: add map_fragment to the death-drop list,
+    // set hasMapFragment = false, and call hud.minimap.reset() here.
+
+    // Create shade from death snapshot (overwrites any existing shade)
+    const snap = this.deathSnapshot;
+    if (snap && snap.slots.some(s => s !== null)) {
+      this.state.activeShade = {
+        inventorySnapshot: snap.slots,
+        position: { x: snap.x, y: snap.y },
+        roomId: snap.room,
+        spawnTime: performance.now(),
+      };
+    } else {
+      // Empty inventory death: overwrite to nothing
+      this.state.activeShade = null;
+    }
+    this.deathSnapshot = null;
+
+    // Tear down current room
+    this.destroyRoomContents();
+
+    // Reset inventory slots (empty); keep quest items in state.inventory
+    this.state.inventorySlots = [null, null, null];
+    this.state.selectedSlot = 0;
+
+    // Remove materials so they respawn as pickups
+    this.state.inventory.delete("wire");
+    this.state.inventory.delete("glass_shards");
+    this.state.inventory.delete("battery");
+    this.state.inventory.delete("tape");
+
+    // Reset radio state (world radios lost; carried radios went into shade)
+    this.state.radio = {
+      carriedRadioId: null,
+      armedRadios: [],
+      collectedRadioIds: new Set(),
+      droppedRadios: [],
+      spentRadios: [],
+    };
+
+    // Reroll loaded lockers
+    this.state.loadedLockers = this.rollLockerJumpers();
+
+    // Reset beacon value but preserve maxBeacon (Whisperer erosion persists)
+    this.beaconState.value = this.beaconState.maxBeacon;
+    updateBeacon(this.beaconState, "silent", 0);
+
+    // Reset dark agitation timers
+    this.darkScreamTimer = 0;
+    this.darkScreamInterval = 0;
+
+    // Swap to reception
+    this.rooms.swapRoom("reception");
+    this.state.currentRoom = "reception";
+    this.world.y = this.app.screen.height - this.rooms.currentRoom.roomHeight;
+
+    // Reset player from CAUGHT back to IDLE
+    this.player.setStandingPose();
+    this.player.x = 1500; // near workbench
+    this.player.y = this.rooms.currentRoom.floorY;
+    this.player.setRoomWidth(this.rooms.currentRoom.roomWidth);
+    this.updateCamera();
+
+    // Populate reception
+    this.createPickups();
+    this.createMonster();
+    this.createDoors();
+    this.createDecorativeProps();
+    this.createForegroundProps();
+    this.createLadderAndUpperFloor();
+    this.createHidingSpots();
+    this.createVents();
+    this.createJumpers();
+    this.createRadioWorldSprites();
+    this.maybeCreateShadeVisual();
+
+    // Reset upper floor state
+    this.playerFloorYOverride = null;
+    this.playerClimbingLadder = null;
+
+    // Restore world visibility (buildEndScreen sets it false)
+    this.world.visible = true;
+
+    // Flashlight
+    if (this.flashlight) {
+      this.flashlight.setVisible(true);
+      this.flashlight.setHidingMode("none");
+      this.flashlight.setBeaconVisuals(
+        this.beaconState.visionRadius,
+        this.beaconState.visionBrightness,
+      );
+      const screenX = this.player.x + this.world.x;
+      const screenY = this.player.y + this.world.y;
+      this.flashlight.update(screenX, screenY);
+    }
+
+    // Audio
+    audioManager.crossfadeAmbient("reception_ambient");
+    this.heartbeat.start();
+
+    // Reset run stats for new life
+    this.state.runStats.startTimeMs = performance.now();
+    this.state.runStats.monsterEncounters = 0;
+    this.state.runStats.roomsReached = new Set<RoomId>(["reception"]);
+
+    // Fade out death overlay to reveal reception
+    if (this.deathFadeOverlay) {
+      await this.animateOverTime(800, (t) => {
+        if (this.deathFadeOverlay) {
+          this.deathFadeOverlay.clear();
+          this.deathFadeOverlay.rect(
+            0, 0, this.app.screen.width, this.app.screen.height,
+          );
+          this.deathFadeOverlay.fill({ color: 0x000000, alpha: 1 - t });
+        }
+      });
+      this.app.stage.removeChild(this.deathFadeOverlay);
+      this.deathFadeOverlay.destroy();
+      this.deathFadeOverlay = null;
+    }
+
+    // Resume gameplay
+    this.state.phase = "PLAYING";
+    this.locked = false;
+    this.hud.showMessage("Your belongings remain where you fell.", 4000);
+  }
+
+  private maybeCreateShadeVisual(): void {
+    if (this.shadeVisual) {
+      this.shadeVisual.destroy();
+      this.shadeVisual = null;
+    }
+
+    const shade = this.state.activeShade;
+    if (!shade || shade.roomId !== this.state.currentRoom) return;
+
+    const frames = [
+      Assets.get<Texture>("shade-tape:shade1") || Texture.WHITE,
+      Assets.get<Texture>("shade-tape:shade2") || Texture.WHITE,
+      Assets.get<Texture>("shade-tape:shade3") || Texture.WHITE,
+    ];
+
+    this.shadeVisual = new ShadeVisual(
+      this.app.stage,
+      shade.position.x,
+      shade.position.y,
+      frames,
+    );
+  }
+
+  private recoverShade(): void {
+    if (!this.state.activeShade) return;
+    this.state.inventorySlots = this.state.activeShade.inventorySnapshot.map(
+      s => s ? { ...s } : null,
+    );
+    this.state.activeShade = null;
+    if (this.shadeVisual) {
+      this.shadeVisual.destroy();
+      this.shadeVisual = null;
+    }
+    this.hud.showMessage("Inventory recovered.");
+    audioManager.playOneShot("keycard_pickup");
+  }
+
   private computeRunStats(): {
     timeSurvivedSec: number;
     roomsReached: number;
@@ -902,8 +1567,12 @@ export class Game {
     const statTime = document.getElementById("stat-time");
     const statRooms = document.getElementById("stat-rooms");
     const statEnc = document.getElementById("stat-encounters");
-    if (statTime) statTime.textContent = `${stats.timeSurvivedSec}s`;
-    if (statRooms) statRooms.textContent = `${stats.roomsReached}/4`;
+    if (statTime) {
+      const mins = Math.floor(stats.timeSurvivedSec / 60);
+      const secs = stats.timeSurvivedSec % 60;
+      statTime.textContent = `${mins}:${String(secs).padStart(2, "0")}`;
+    }
+    if (statRooms) statRooms.textContent = `${stats.roomsReached}/5`;
     if (statEnc) statEnc.textContent = String(stats.monsterEncounters);
     document.getElementById("gameover-stats")?.classList.add("visible");
   }
@@ -1023,6 +1692,8 @@ export class Game {
 
     // Stop audio (not unload; assets persist)
     audioManager.stopAllMonsterVocals();
+    audioManager.stopAllBlobs();
+    this.stopAllNarrations();
     audioManager.fadeOutAmbient(100);
 
     // Cancel pending TTS calls
@@ -1031,8 +1702,25 @@ export class Game {
     }
     this.armedRadioAborts.clear();
 
-    // Clean up radio popup
+    // Clean up radio popup and workbench menu
     this.radioPopup.destroy();
+    this.workbenchMenu.destroy();
+
+    // Clean up crafting effects
+    this.projectiles.forEach((p) => p.destroy());
+    this.projectiles = [];
+    this.flareEffects.forEach((f) => f.destroy());
+    this.flareEffects = [];
+    this.smokeBombEffects.forEach((s) => s.destroy());
+    this.smokeBombEffects = [];
+    this.decoyEffects.forEach((d) => d.destroy());
+    this.decoyEffects = [];
+
+    // Clean up shade visual (stage child, not world child)
+    if (this.shadeVisual) {
+      this.shadeVisual.destroy();
+      this.shadeVisual = null;
+    }
 
     // Clean up HUD (lives on stage, not world)
     this.hud.destroy();
@@ -1061,21 +1749,66 @@ export class Game {
       if (this.input.isLeft() || this.input.isRight()) {
         this.tryExitHide();
       }
-    } else {
-      const nearestSpot = this.getNearestHidingSpot();
-      if (nearestSpot) {
-        const label =
-          nearestSpot.kind === "locker" ? "in locker" : "under desk";
-        this.hud.showPrompt(`Press E to hide ${label}`);
-      } else {
-        const nearbyRadio = this.getNearbyRadioPickup();
-        if (nearbyRadio) {
-          this.hud.showPrompt("Press E to take radio");
-        } else {
-          this.hud.clearPrompt();
-        }
-      }
+      return;
     }
+
+    const nearestSpot = this.getNearestHidingSpot();
+    if (nearestSpot) {
+      const label =
+        nearestSpot.kind === "locker" ? "in locker" : "under desk";
+      this.hud.showPrompt(`Press E to hide ${label}`);
+      return;
+    }
+
+    const nearbyRadio = this.getNearbyRadioPickup();
+    if (nearbyRadio) {
+      this.hud.showPrompt("Press E to take radio");
+      return;
+    }
+
+    // Interactable pickup prompt
+    for (const pickup of this.pickups) {
+      if (!pickup.isInteractable()) continue;
+      if (!pickup.isInRange(this.player.x)) continue;
+      if (pickup.config.togglesTo) {
+        this.hud.showPrompt("Press E to flip switch");
+      } else if (isLoreTapeId(pickup.config.id)) {
+        this.hud.showPrompt("Press E to take tape");
+      } else {
+        const name = pickup.config.id.replace(/_/g, " ");
+        this.hud.showPrompt(`Press E to take ${name}`);
+      }
+      return;
+    }
+
+    // Workbench prompt
+    if (this.isNearWorkbench()) {
+      this.hud.showPrompt("Press E to open workbench");
+      return;
+    }
+
+    // Shade recovery prompt
+    if (this.shadeVisual && this.state.activeShade &&
+        this.shadeVisual.isPlayerInRange(this.player.x, this.player.y)) {
+      this.hud.showPrompt("Press E to recover inventory");
+      return;
+    }
+
+    // Vent prompt
+    const vent = this.rooms.getNearbyVent(this.player.x);
+    if (vent) {
+      this.hud.showPrompt("Press E to crawl through vent");
+      return;
+    }
+
+    // Door prompt
+    const door = this.rooms.getNearbyDoor(this.player.x);
+    if (door) {
+      this.hud.showPrompt("Press E to open door");
+      return;
+    }
+
+    this.hud.clearPrompt();
   }
 
   private getNearestHidingSpot(): HidingSpot | null {
@@ -1088,6 +1821,22 @@ export class Game {
   }
 
   private enterHide(spot: HidingSpot): void {
+    // Locker Jumper risk check
+    if (spot.kind === "locker") {
+      const spotIndex = this.getLockerSpotIndex(spot);
+      const key = `${this.state.currentRoom}:${spotIndex}`;
+      if (this.state.loadedLockers[key]) {
+        // Jumper ambush from locker. Player does NOT enter.
+        this.state.loadedLockers[key] = false;
+        const floorY = this.rooms.currentRoom.floorY;
+        const hotspot: JumperHotspot = { x: spot.x, ventY: floorY };
+        const lockerJumper = new Jumper(hotspot, floorY, this.manifest, this.world, true);
+        this.jumpers.push(lockerJumper);
+        audioManager.playOneShot("locker_open");
+        return;
+      }
+    }
+
     this.state.hidingState = {
       active: true,
       spotId: spot.id,
@@ -1113,6 +1862,12 @@ export class Game {
     this.deskChargeRolled = false;
     this.deskChargeFound = false;
     this.hud.setHiddenVisible(true);
+  }
+
+  private getLockerSpotIndex(spot: HidingSpot): number {
+    const def = this.rooms.currentDef;
+    if (!def.hidingSpots) return -1;
+    return def.hidingSpots.findIndex((s) => s.id === spot.id);
   }
 
   private tryExitHide(): void {
@@ -1146,6 +1901,23 @@ export class Game {
     this.hud.setHiddenVisible(false);
   }
 
+  // ── Door sprites ──
+
+  private createDoors(): void {
+    const def = this.rooms.currentDef;
+    const floorY = this.rooms.currentRoom.floorY;
+
+    for (const door of def.doors) {
+      const texture = Assets.get<Texture>("props:door-closed");
+      const sprite = new Sprite(texture || Texture.WHITE);
+      sprite.anchor.set(0.5, 1.0);
+      sprite.x = door.fromX;
+      sprite.y = floorY;
+      this.rooms.currentRoom.addChild(sprite);
+      this.doorSprites.push(sprite);
+    }
+  }
+
   // ── Decorative props ──
 
   private createDecorativeProps(): void {
@@ -1153,7 +1925,8 @@ export class Game {
     if (!def.decorativeProps) return;
 
     for (const propDef of def.decorativeProps) {
-      const texture = Assets.get<Texture>("props:" + propDef.frameName);
+      const alias = propDef.frameName.includes(":") ? propDef.frameName : "props:" + propDef.frameName;
+      const texture = Assets.get<Texture>(alias);
       const sprite = new Sprite(texture || Texture.WHITE);
       sprite.anchor.set(0.5, 1.0);
       sprite.x = propDef.x;
@@ -1173,6 +1946,206 @@ export class Game {
     }
   }
 
+  // ── Ladder / climbing system ──
+
+  private handleClimbing(dt: number): void {
+    const ladder = this.playerClimbingLadder!;
+    const speed = Game.CLIMB_SPEED * dt;
+
+    // Up moves player toward topY (lower screen Y)
+    if (this.input.isUp()) {
+      this.player.y -= speed;
+    }
+    // Down moves player toward bottomY (higher screen Y)
+    if (this.input.isDown()) {
+      this.player.y += speed;
+    }
+
+    // Clamp Y within ladder bounds
+    this.player.y = Math.max(ladder.topY, Math.min(ladder.bottomY, this.player.y));
+
+    // Reached the top: step onto upper floor
+    if (this.player.y <= ladder.topY && this.input.isUp()) {
+      this.playerFloorYOverride = ladder.topY;
+      this.playerClimbingLadder = null;
+      this.player.y = ladder.topY;
+      this.player.setStandingPose();
+    }
+
+    // Reached the bottom: step onto ground floor
+    if (this.player.y >= ladder.bottomY && this.input.isDown()) {
+      this.playerFloorYOverride = null;
+      this.playerClimbingLadder = null;
+      this.player.y = ladder.bottomY;
+      this.player.setStandingPose();
+    }
+  }
+
+  private checkLadderEntryFromGround(): void {
+    const def = this.rooms.currentDef;
+    if (!def.ladders) return;
+    if (this.state.hidingState.active) return;
+    // Player must hold W/Up near a ladder
+    if (!this.input.isUp()) return;
+
+    for (const ladder of def.ladders) {
+      if (Math.abs(this.player.x - ladder.x) < ladder.triggerWidth / 2) {
+        this.playerClimbingLadder = ladder;
+        this.player.x = ladder.x;
+        this.player.y = ladder.bottomY;
+        this.player.setHidingPose("locker"); // reuse crouch pose for climbing
+        return;
+      }
+    }
+  }
+
+  private checkLadderEntryFromUpper(): void {
+    const def = this.rooms.currentDef;
+    if (!def.ladders) return;
+    if (this.state.hidingState.active) return;
+    // Player must hold S/Down near a ladder while on upper floor
+    if (!this.input.isDown()) return;
+
+    for (const ladder of def.ladders) {
+      if (Math.abs(this.player.x - ladder.x) < ladder.triggerWidth / 2) {
+        this.playerClimbingLadder = ladder;
+        this.player.x = ladder.x;
+        this.player.y = ladder.topY;
+        this.player.setHidingPose("locker"); // reuse crouch pose for climbing
+        return;
+      }
+    }
+  }
+
+  /** Render ladder sprites and upper background for the current room if applicable. */
+  private createLadderAndUpperFloor(): void {
+    const def = this.rooms.currentDef;
+    if (!def.ladders || !def.upperBg) return;
+
+    const floorY = this.rooms.currentRoom.floorY;
+    const upperFloorY = def.upperFloorY ?? floorY - 380;
+
+    // Upper background sprite -- positioned at upper floor left edge
+    const upperTex = Assets.get<Texture>(def.upperBg);
+    const xMin = def.upperFloorXMin ?? 0;
+    const xMax = def.upperFloorXMax ?? this.rooms.currentRoom.roomWidth;
+    if (upperTex) {
+      const upperSprite = new Sprite(upperTex);
+      upperSprite.anchor.set(0, 1.0);
+      upperSprite.x = xMin;
+      upperSprite.y = upperFloorY;
+      upperSprite.zIndex = 5; // above room bg (0), below player (50)
+      upperSprite.eventMode = "none";
+      this.world.addChild(upperSprite);
+      this.upperBgSprite = upperSprite;
+    }
+
+    // Catwalk surface strip (tiled metal grating at the upper floor line).
+    // Pixi v8 TilingSprite: https://pixijs.com/8.x/guides/components/sprite-tiling-tilingsprite
+    const catwalkTex = Assets.get<Texture>("traversal:catwalk");
+    if (catwalkTex) {
+      const catwalkStrip = new TilingSprite({
+        texture: catwalkTex,
+        width: xMax - xMin,
+        height: catwalkTex.height,
+      });
+      catwalkStrip.anchor.set(0, 1.0);
+      catwalkStrip.x = xMin;
+      catwalkStrip.y = upperFloorY;
+      catwalkStrip.zIndex = 10; // above upper-bg (5), below ladder (30)
+      catwalkStrip.eventMode = "none";
+      this.world.addChild(catwalkStrip);
+      this.upperCatwalkSprite = catwalkStrip;
+    }
+
+    // Render ladders
+    for (const ladder of def.ladders) {
+      // Bottom piece
+      const bottomTex = Assets.get<Texture>("traversal:ladder-bottom");
+      if (bottomTex) {
+        const bottomSprite = new Sprite(bottomTex);
+        bottomSprite.anchor.set(0.5, 1.0);
+        bottomSprite.x = ladder.x;
+        bottomSprite.y = ladder.bottomY;
+        bottomSprite.zIndex = 30; // behind player (50)
+        this.world.addChild(bottomSprite);
+        this.ladderSprites.push(bottomSprite);
+      }
+
+      // Mid pieces (tiled vertically)
+      const midTex = Assets.get<Texture>("traversal:ladder-mid");
+      if (midTex) {
+        const totalHeight = ladder.bottomY - ladder.topY;
+        const midHeight = midTex.height;
+        // Leave space for top and bottom pieces (~260px each)
+        const midStart = ladder.bottomY - 260;
+        const midEnd = ladder.topY + 270;
+        const midSpan = midStart - midEnd;
+        const midCount = Math.max(0, Math.floor(midSpan / midHeight));
+        for (let i = 0; i < midCount; i++) {
+          const midSprite = new Sprite(midTex);
+          midSprite.anchor.set(0.5, 1.0);
+          midSprite.x = ladder.x;
+          midSprite.y = midStart - i * midHeight;
+          midSprite.zIndex = 30;
+          this.world.addChild(midSprite);
+          this.ladderSprites.push(midSprite);
+        }
+      }
+
+      // Top piece
+      const topTex = Assets.get<Texture>("traversal:ladder-top");
+      if (topTex) {
+        const topSprite = new Sprite(topTex);
+        topSprite.anchor.set(0.5, 1.0);
+        topSprite.x = ladder.x;
+        topSprite.y = ladder.topY + 20;
+        topSprite.zIndex = 30;
+        this.world.addChild(topSprite);
+        this.ladderSprites.push(topSprite);
+      }
+
+      // Hatch at top
+      const hatchTex = Assets.get<Texture>("traversal:hatch");
+      if (hatchTex) {
+        const hatchSprite = new Sprite(hatchTex);
+        hatchSprite.anchor.set(0.5, 1.0);
+        hatchSprite.x = ladder.x;
+        hatchSprite.y = ladder.topY;
+        hatchSprite.zIndex = 55; // slightly above player
+        this.world.addChild(hatchSprite);
+        this.ladderSprites.push(hatchSprite);
+      }
+    }
+  }
+
+  // ── Foreground props (render above player for depth occlusion) ──
+
+  private createForegroundProps(): void {
+    const def = this.rooms.currentDef;
+    if (!def.foregroundProps || def.foregroundProps.length === 0) return;
+
+    const roomWidth = this.rooms.currentRoom.roomWidth;
+
+    for (const prop of def.foregroundProps) {
+      const tex = Assets.get<Texture>(prop.key);
+      if (!tex) {
+        console.warn(`[room] foreground prop missing texture: ${prop.key}`);
+        continue;
+      }
+      // Clamp x to room bounds
+      const x = Math.min(prop.x, roomWidth - 50);
+      const sprite = new Sprite(tex);
+      sprite.anchor.set(0.5, 1.0);
+      sprite.x = x;
+      sprite.y = prop.anchorBottomY;
+      if (prop.scale !== undefined) sprite.scale.set(prop.scale);
+      if (prop.tint !== undefined) sprite.tint = prop.tint;
+      sprite.eventMode = "none"; // skip hit-testing for performance
+      this.foregroundLayer.addChild(sprite);
+    }
+  }
+
   private createHidingSpots(): void {
     const def = this.rooms.currentDef;
     if (!def.hidingSpots) return;
@@ -1183,6 +2156,133 @@ export class Game {
       this.world.addChild(spot.sprite);
       this.hidingSpots.push(spot);
     }
+  }
+
+  // ── Vent sprites ──
+
+  private createVents(): void {
+    const def = this.rooms.currentDef;
+    if (!def.vents) return;
+    const floorY = this.rooms.currentRoom.floorY;
+
+    for (const ventDef of def.vents) {
+      const texture = Assets.get<Texture>("vents:open");
+      const sprite = new Sprite(texture || Texture.WHITE);
+      sprite.anchor.set(0.5, 1.0);
+      sprite.x = ventDef.x;
+      sprite.y = floorY;
+      sprite.scale.set(0.4);
+      this.world.addChild(sprite);
+      this.ventSprites.push(sprite);
+    }
+  }
+
+  // ── Jumper system ──
+
+  private createJumpers(): void {
+    const def = this.rooms.currentDef;
+    if (!def.jumperHotspots) return;
+    const floorY = this.rooms.currentRoom.floorY;
+
+    for (const hotspot of def.jumperHotspots) {
+      // Upper-floor jumpers use the upper floor Y as their landing floor
+      const jumperFloorY = (hotspot.floorLevel === "upper" && def.upperFloorY)
+        ? def.upperFloorY
+        : floorY;
+
+      // Place drip vent sprite at the hotspot
+      const dripTexture = Assets.get<Texture>("vents:drip");
+      const dripSprite = new Sprite(dripTexture || Texture.WHITE);
+      dripSprite.anchor.set(0.5, 0.0);
+      dripSprite.x = hotspot.x;
+      dripSprite.y = hotspot.ventY;
+      dripSprite.scale.set(0.4);
+      this.world.addChild(dripSprite);
+      this.jumperDripSprites.push(dripSprite);
+
+      // Create the Jumper entity
+      const jumper = new Jumper(hotspot, jumperFloorY, this.manifest, this.world);
+      this.jumpers.push(jumper);
+    }
+  }
+
+  private rollLockerJumpers(): Record<string, boolean> {
+    const result: Record<string, boolean> = {};
+    for (const [roomId, def] of Object.entries(ROOM_DEFINITIONS)) {
+      if (!def.hidingSpots) continue;
+      def.hidingSpots.forEach((spot, idx) => {
+        if (spot.kind !== "locker") return;
+        const key = `${roomId}:${idx}`;
+        result[key] = Math.random() < 0.25;
+      });
+    }
+    return result;
+  }
+
+  // ── Whisperer system ──
+
+  private updateWhisperer(dtMS: number): void {
+    const room = ROOM_DEFINITIONS[this.state.currentRoom];
+    if (!room.whispererCanSpawn) {
+      // Player is in a non-whisperer room; despawn if active
+      if (this.whisperer) {
+        this.whisperer.destroy();
+        this.whisperer = null;
+      }
+      this.whispererSpawnCheckTimer = 0;
+      return;
+    }
+
+    if (this.whisperer === null) {
+      // Try to spawn
+      this.whispererSpawnCheckTimer += dtMS;
+      if (this.whispererSpawnCheckTimer >= Game.WHISPERER_SPAWN_CHECK_INTERVAL_MS) {
+        this.whispererSpawnCheckTimer = 0;
+        const chance = room.whispererSpawnChance ?? Game.WHISPERER_SPAWN_PROBABILITY;
+        if (Math.random() < chance) {
+          this.spawnWhisperer();
+        }
+      }
+    } else {
+      // Compute camera viewport in world coords
+      const cameraLeft = -this.world.x;
+      const cameraRight = cameraLeft + this.app.screen.width;
+
+      this.whisperer.update(
+        dtMS,
+        this.player.x,
+        this.player.facingDirection,
+        this.beaconState,
+        cameraLeft,
+        cameraRight,
+      );
+
+      // Flare repel: any active flare within range forces fading (no beacon penalty)
+      if (this.whisperer.state === "idle") {
+        for (const flare of this.flareEffects) {
+          if (flare.isWhispererRepelled(this.whisperer.container.x, this.whisperer.container.y)) {
+            this.whisperer.forceFade();
+            break;
+          }
+        }
+      }
+
+      if (this.whisperer.isDespawned()) {
+        this.whisperer.destroy();
+        this.whisperer = null;
+      }
+    }
+  }
+
+  private spawnWhisperer(): void {
+    const playerX = this.player.x;
+    const roomWidth = this.rooms.currentRoom.roomWidth;
+    // Spawn 600px to the left or right of the player, clamped to room bounds
+    const side = Math.random() < 0.5 ? -1 : 1;
+    let spawnX = playerX + side * 600;
+    spawnX = Math.max(60, Math.min(roomWidth - 60, spawnX));
+    const floorY = this.rooms.currentRoom.floorY;
+    this.whisperer = new Whisperer(this.manifest, this.world, spawnX, floorY);
   }
 
   // ── Radio bait system ──
@@ -1221,11 +2321,29 @@ export class Game {
       });
       // Create dropped sprite
       this.createDroppedRadioSprite(oldId, this.player.x);
+      // Free the old radio's inventory slot
+      const oldSlot = this.state.inventorySlots.findIndex(
+        (s) => s !== null && s.kind === "radio",
+      );
+      if (oldSlot !== -1) this.state.inventorySlots[oldSlot] = null;
+    } else {
+      // Not carrying a radio - need an empty slot
+      const emptySlot = this.state.inventorySlots.indexOf(null);
+      if (emptySlot === -1) {
+        this.hud.showMessage("Inventory full.", 2000);
+        return;
+      }
     }
 
     // Pick up the new radio
     this.state.radio.carriedRadioId = rpDef.radioId;
     this.state.radio.collectedRadioIds.add(rpDef.radioId);
+
+    // Place radio in first empty inventory slot
+    const newSlot = this.state.inventorySlots.indexOf(null);
+    if (newSlot !== -1) {
+      this.state.inventorySlots[newSlot] = { kind: "radio" };
+    }
 
     // Remove from droppedRadios if picking up a dropped one
     this.state.radio.droppedRadios = this.state.radio.droppedRadios.filter(
@@ -1266,7 +2384,6 @@ export class Game {
 
     // Commit arm
     const armedId = `armed_${Date.now()}`;
-    const floorY = this.rooms.currentRoom.floorY;
     const armed: ArmedRadio = {
       id: armedId,
       message: result.message,
@@ -1274,13 +2391,19 @@ export class Game {
       remainingMs: result.timerSec * 1000,
       ttsState: "loading",
       ttsBlobUrl: null,
-      position: { x: this.player.x, y: floorY },
+      position: { x: this.player.x, y: this.currentFloorY() },
       thrown: false,
       velocity: { x: 0, y: 0 },
       roomId: this.state.currentRoom,
     };
     this.state.radio.armedRadios.push(armed);
     this.state.radio.carriedRadioId = null;
+
+    // Remove radio from inventory slot
+    const radioSlot = this.state.inventorySlots.findIndex(
+      (s) => s !== null && s.kind === "radio",
+    );
+    if (radioSlot !== -1) this.state.inventorySlots[radioSlot] = null;
 
     // Resume game
     this.state.phase = "PLAYING";
@@ -1531,6 +2654,151 @@ export class Game {
       sprite.destroy();
     }
     this.spentRadioSprites.clear();
+  }
+
+  // ── Crafting: throw, effects, workbench ──
+
+  private static readonly MATERIAL_IDS = new Set([
+    "wire",
+    "glass_shards",
+    "battery",
+    "tape",
+  ]);
+
+  private throwSelectedItem(): void {
+    const slot = this.state.inventorySlots[this.state.selectedSlot];
+    if (!slot || slot.kind !== "crafted") return;
+
+    const itemId = slot.id;
+    this.state.inventorySlots[this.state.selectedSlot] = null;
+
+    const dir = this.player.facingDirection;
+    const floorY = this.currentFloorY();
+
+    let textureAlias: string;
+    switch (itemId) {
+      case "flare":
+        textureAlias = "flare:unlit";
+        break;
+      case "smoke_bomb":
+        textureAlias = "smokebomb:idle";
+        break;
+      case "decoy_radio":
+        textureAlias = "decoy-radio:idle";
+        break;
+    }
+
+    const texture = Assets.get<Texture>(textureAlias) || Texture.WHITE;
+    const projectile = new Projectile(
+      this.world,
+      texture,
+      this.player.x,
+      floorY - 40,
+      dir * 600,
+      -500,
+      1500,
+      floorY,
+      0.12,
+      (landX, landY) => this.onItemLand(itemId, landX, landY),
+    );
+    this.projectiles.push(projectile);
+
+    if (audioManager.has("radio_throw")) {
+      audioManager.playOneShot("radio_throw");
+    }
+  }
+
+  private onItemLand(itemId: CraftedItemId, x: number, y: number): void {
+    switch (itemId) {
+      case "flare": {
+        const flare = new FlareEffect(this.world, x, y);
+        this.flareEffects.push(flare);
+        // Listener attraction on ignition
+        if (this.monster) this.monster.addSuspicion(30);
+        break;
+      }
+      case "smoke_bomb": {
+        const smoke = new SmokeBombEffect(this.world, x, y);
+        this.smokeBombEffects.push(smoke);
+        break;
+      }
+      case "decoy_radio": {
+        const decoy = new DecoyEffect(this.world, x, y);
+        this.decoyEffects.push(decoy);
+        // Lure monster toward decoy for 3 seconds
+        if (this.monster) {
+          this.monster.startLure({ targetX: x, durationMs: 3000 });
+          this.monster.addSuspicion(30);
+        }
+        break;
+      }
+    }
+  }
+
+  private updateProjectiles(dtMS: number): void {
+    for (const p of this.projectiles) p.update(dtMS);
+    this.projectiles = this.projectiles.filter((p) => {
+      if (p.landed) {
+        p.destroy();
+        return false;
+      }
+      return true;
+    });
+  }
+
+  private updateFlareEffects(dtMS: number): void {
+    for (const f of this.flareEffects) {
+      f.update(dtMS, this.beaconState, this.player.x, this.player.y);
+    }
+    this.flareEffects = this.flareEffects.filter((f) => {
+      if (f.expired) {
+        f.destroy();
+        return false;
+      }
+      return true;
+    });
+  }
+
+  private updateSmokeBombEffects(dtMS: number): void {
+    for (const sb of this.smokeBombEffects) sb.update(dtMS);
+    this.smokeBombEffects = this.smokeBombEffects.filter((sb) => {
+      if (sb.expired) {
+        sb.destroy();
+        return false;
+      }
+      return true;
+    });
+  }
+
+  private updateDecoyEffects(dtMS: number): void {
+    for (const d of this.decoyEffects) d.update(dtMS);
+  }
+
+  private isNearWorkbench(): boolean {
+    const def = ROOM_DEFINITIONS[this.state.currentRoom];
+    if (!def.workbench) return false;
+    return Math.abs(this.player.x - def.workbench.x) < def.workbench.triggerWidth;
+  }
+
+  private async openWorkbench(): Promise<void> {
+    if (this.state.phase !== "PLAYING") return;
+
+    this.state.phase = "PAUSED";
+    this.app.ticker.stop();
+
+    const result = await this.workbenchMenu.show(this.state.inventorySlots);
+    this.input.clearAll();
+
+    if (result !== null) {
+      const recipe = RECIPES[result.recipeIndex];
+      if (craft(this.state.inventorySlots, recipe)) {
+        this.hud.showMessage(`Crafted ${recipe.name}.`, 2000);
+        audioManager.playOneShot("keycard_pickup");
+      }
+    }
+
+    this.state.phase = "PLAYING";
+    this.app.ticker.start();
   }
 
   // ── Camera ──

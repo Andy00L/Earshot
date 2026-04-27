@@ -1,4 +1,10 @@
 {
+  "archives": {
+    "type": "single",
+    "file": "assets/archives.png",
+    "width": 2044,
+    "height": 769
+  },
   "cubicles": {
     "type": "single",
     "file": "assets/cubicles.png",
@@ -90,6 +96,12 @@
     "width": 2896,
     "height": 1086
   },
+  "server-upper": {
+    "type": "single",
+    "file": "assets/server-upper.png",
+    "width": 2172,
+    "height": 724
+  },
   "server": {
     "type": "single",
     "file": "assets/server.png",
@@ -107,6 +119,732 @@
     "file": "assets/title.png",
     "width": 1672,
     "height": 941
+  },
+  "ui": {
+    "type": "character",
+    "frames": {
+      "beacon-meter-fill": {
+        "file": "assets/ui/beacon-meter-fill.png",
+        "width": 1272,
+        "height": 155,
+        "baselineY": 154
+      },
+      "beacon-meter-frame": {
+        "file": "assets/ui/beacon-meter-frame.png",
+        "width": 1144,
+        "height": 207,
+        "baselineY": 206
+      },
+      "craft-button-available": {
+        "file": "assets/ui/craft-button-available.png",
+        "width": 1556,
+        "height": 298,
+        "baselineY": 297
+      },
+      "craft-button-locked": {
+        "file": "assets/ui/craft-button-locked.png",
+        "width": 1557,
+        "height": 298,
+        "baselineY": 297
+      },
+      "craft-menu-bg": {
+        "file": "assets/ui/craft-menu-bg.png",
+        "width": 844,
+        "height": 1073,
+        "baselineY": 1072
+      },
+      "flare-light-overlay": {
+        "file": "assets/ui/flare-light-overlay.png",
+        "width": 1254,
+        "height": 1254,
+        "baselineY": 1253
+      },
+      "inventory-slot-empty": {
+        "file": "assets/ui/inventory-slot-empty.png",
+        "width": 623,
+        "height": 650,
+        "baselineY": 649
+      },
+      "inventory-slot-selected": {
+        "file": "assets/ui/inventory-slot-selected.png",
+        "width": 649,
+        "height": 673,
+        "baselineY": 672
+      },
+      "minimap-frame": {
+        "file": "assets/ui/minimap-frame.png",
+        "width": 834,
+        "height": 645,
+        "baselineY": 644
+      },
+      "minimap-player-dot": {
+        "file": "assets/ui/minimap-player-dot.png",
+        "width": 52,
+        "height": 49,
+        "baselineY": 48
+      },
+      "minimap-room-tile": {
+        "file": "assets/ui/minimap-room-tile.png",
+        "width": 226,
+        "height": 154,
+        "baselineY": 153
+      }
+    },
+    "boundingBox": {
+      "width": 1557,
+      "height": 1254
+    }
+  },
+  "bookshelves": {
+    "type": "character",
+    "frames": {
+      "normal": {
+        "file": "assets/bookshelves/normal.png",
+        "width": 286,
+        "height": 514,
+        "baselineY": 513,
+        "sourceAtlas": "bookshelves-sheet"
+      },
+      "fake": {
+        "file": "assets/bookshelves/fake.png",
+        "width": 313,
+        "height": 553,
+        "baselineY": 552,
+        "sourceAtlas": "bookshelves-sheet"
+      },
+      "ajar-30": {
+        "file": "assets/bookshelves/ajar-30.png",
+        "width": 336,
+        "height": 542,
+        "baselineY": 541,
+        "sourceAtlas": "bookshelves-sheet"
+      },
+      "ajar-90": {
+        "file": "assets/bookshelves/ajar-90.png",
+        "width": 279,
+        "height": 524,
+        "baselineY": 523,
+        "sourceAtlas": "bookshelves-sheet"
+      },
+      "cabinet": {
+        "file": "assets/bookshelves/cabinet.png",
+        "width": 337,
+        "height": 538,
+        "baselineY": 537,
+        "sourceAtlas": "bookshelves-sheet"
+      },
+      "storage-rack": {
+        "file": "assets/bookshelves/storage-rack.png",
+        "width": 311,
+        "height": 554,
+        "baselineY": 553,
+        "sourceAtlas": "bookshelves-sheet"
+      }
+    },
+    "boundingBox": {
+      "width": 337,
+      "height": 554
+    }
+  },
+  "cubicle-dividers": {
+    "type": "character",
+    "frames": {
+      "straight": {
+        "file": "assets/cubicle-dividers/straight.png",
+        "width": 177,
+        "height": 376,
+        "baselineY": 375,
+        "sourceAtlas": "cubicle-dividers-sheet"
+      },
+      "straight-damaged": {
+        "file": "assets/cubicle-dividers/straight-damaged.png",
+        "width": 360,
+        "height": 376,
+        "baselineY": 375,
+        "sourceAtlas": "cubicle-dividers-sheet"
+      },
+      "l-corner": {
+        "file": "assets/cubicle-dividers/l-corner.png",
+        "width": 362,
+        "height": 375,
+        "baselineY": 374,
+        "sourceAtlas": "cubicle-dividers-sheet"
+      },
+      "l-corner-damaged": {
+        "file": "assets/cubicle-dividers/l-corner-damaged.png",
+        "width": 296,
+        "height": 373,
+        "baselineY": 372,
+        "sourceAtlas": "cubicle-dividers-sheet"
+      },
+      "half-height": {
+        "file": "assets/cubicle-dividers/half-height.png",
+        "width": 360,
+        "height": 351,
+        "baselineY": 350,
+        "sourceAtlas": "cubicle-dividers-sheet"
+      },
+      "gap": {
+        "file": "assets/cubicle-dividers/gap.png",
+        "width": 304,
+        "height": 351,
+        "baselineY": 350,
+        "sourceAtlas": "cubicle-dividers-sheet"
+      }
+    },
+    "boundingBox": {
+      "width": 362,
+      "height": 376
+    }
+  },
+  "decoy-radio": {
+    "type": "character",
+    "frames": {
+      "idle": {
+        "file": "assets/decoy-radio/idle.png",
+        "width": 210,
+        "height": 423,
+        "baselineY": 422,
+        "sourceAtlas": "decoy-radio-sheet"
+      },
+      "armed": {
+        "file": "assets/decoy-radio/armed.png",
+        "width": 210,
+        "height": 423,
+        "baselineY": 422,
+        "sourceAtlas": "decoy-radio-sheet"
+      },
+      "broadcasting1": {
+        "file": "assets/decoy-radio/broadcasting1.png",
+        "width": 295,
+        "height": 423,
+        "baselineY": 422,
+        "sourceAtlas": "decoy-radio-sheet"
+      },
+      "broadcasting2": {
+        "file": "assets/decoy-radio/broadcasting2.png",
+        "width": 358,
+        "height": 429,
+        "baselineY": 428,
+        "sourceAtlas": "decoy-radio-sheet"
+      },
+      "peak": {
+        "file": "assets/decoy-radio/peak.png",
+        "width": 353,
+        "height": 423,
+        "baselineY": 422,
+        "sourceAtlas": "decoy-radio-sheet"
+      },
+      "spent": {
+        "file": "assets/decoy-radio/spent.png",
+        "width": 212,
+        "height": 423,
+        "baselineY": 422,
+        "sourceAtlas": "decoy-radio-sheet"
+      }
+    },
+    "boundingBox": {
+      "width": 358,
+      "height": 429
+    }
+  },
+  "flare": {
+    "type": "character",
+    "frames": {
+      "unlit": {
+        "file": "assets/flare/unlit.png",
+        "width": 306,
+        "height": 106,
+        "baselineY": 105,
+        "sourceAtlas": "flare-sheet"
+      },
+      "igniting": {
+        "file": "assets/flare/igniting.png",
+        "width": 245,
+        "height": 525,
+        "baselineY": 524,
+        "sourceAtlas": "flare-sheet"
+      },
+      "burn1": {
+        "file": "assets/flare/burn1.png",
+        "width": 189,
+        "height": 623,
+        "baselineY": 622,
+        "sourceAtlas": "flare-sheet"
+      },
+      "burn2": {
+        "file": "assets/flare/burn2.png",
+        "width": 192,
+        "height": 590,
+        "baselineY": 589,
+        "sourceAtlas": "flare-sheet"
+      },
+      "dying": {
+        "file": "assets/flare/dying.png",
+        "width": 138,
+        "height": 488,
+        "baselineY": 487,
+        "sourceAtlas": "flare-sheet"
+      },
+      "burnt-out": {
+        "file": "assets/flare/burnt-out.png",
+        "width": 88,
+        "height": 330,
+        "baselineY": 329,
+        "sourceAtlas": "flare-sheet"
+      }
+    },
+    "boundingBox": {
+      "width": 306,
+      "height": 623
+    }
+  },
+  "jumper": {
+    "type": "character",
+    "frames": {
+      "attack1": {
+        "file": "assets/jumper/attack1.png",
+        "width": 340,
+        "height": 192,
+        "baselineY": 191,
+        "sourceAtlas": "jumper-attack-sheet"
+      },
+      "attack2": {
+        "file": "assets/jumper/attack2.png",
+        "width": 362,
+        "height": 217,
+        "baselineY": 216,
+        "sourceAtlas": "jumper-attack-sheet"
+      },
+      "attack3": {
+        "file": "assets/jumper/attack3.png",
+        "width": 362,
+        "height": 205,
+        "baselineY": 204,
+        "sourceAtlas": "jumper-attack-sheet"
+      },
+      "attack4": {
+        "file": "assets/jumper/attack4.png",
+        "width": 362,
+        "height": 211,
+        "baselineY": 210,
+        "sourceAtlas": "jumper-attack-sheet"
+      },
+      "attack5": {
+        "file": "assets/jumper/attack5.png",
+        "width": 326,
+        "height": 217,
+        "baselineY": 216,
+        "sourceAtlas": "jumper-attack-sheet"
+      },
+      "attack6": {
+        "file": "assets/jumper/attack6.png",
+        "width": 252,
+        "height": 173,
+        "baselineY": 172,
+        "sourceAtlas": "jumper-attack-sheet"
+      },
+      "emerge1": {
+        "file": "assets/jumper/emerge1.png",
+        "width": 284,
+        "height": 185,
+        "baselineY": 184,
+        "sourceAtlas": "jumper-emerge-sheet"
+      },
+      "emerge2": {
+        "file": "assets/jumper/emerge2.png",
+        "width": 283,
+        "height": 185,
+        "baselineY": 184,
+        "sourceAtlas": "jumper-emerge-sheet"
+      },
+      "emerge3": {
+        "file": "assets/jumper/emerge3.png",
+        "width": 283,
+        "height": 280,
+        "baselineY": 279,
+        "sourceAtlas": "jumper-emerge-sheet"
+      },
+      "emerge4": {
+        "file": "assets/jumper/emerge4.png",
+        "width": 284,
+        "height": 321,
+        "baselineY": 320,
+        "sourceAtlas": "jumper-emerge-sheet"
+      },
+      "emerge5": {
+        "file": "assets/jumper/emerge5.png",
+        "width": 283,
+        "height": 528,
+        "baselineY": 527,
+        "sourceAtlas": "jumper-emerge-sheet"
+      },
+      "emerge6": {
+        "file": "assets/jumper/emerge6.png",
+        "width": 283,
+        "height": 494,
+        "baselineY": 493,
+        "sourceAtlas": "jumper-emerge-sheet"
+      },
+      "fall1": {
+        "file": "assets/jumper/fall1.png",
+        "width": 286,
+        "height": 427,
+        "baselineY": 426,
+        "sourceAtlas": "jumper-fall-sheet"
+      },
+      "fall2": {
+        "file": "assets/jumper/fall2.png",
+        "width": 307,
+        "height": 363,
+        "baselineY": 362,
+        "sourceAtlas": "jumper-fall-sheet"
+      },
+      "fall3": {
+        "file": "assets/jumper/fall3.png",
+        "width": 341,
+        "height": 318,
+        "baselineY": 317,
+        "sourceAtlas": "jumper-fall-sheet"
+      },
+      "fall4": {
+        "file": "assets/jumper/fall4.png",
+        "width": 358,
+        "height": 220,
+        "baselineY": 219,
+        "sourceAtlas": "jumper-fall-sheet"
+      },
+      "fall5": {
+        "file": "assets/jumper/fall5.png",
+        "width": 357,
+        "height": 252,
+        "baselineY": 251,
+        "sourceAtlas": "jumper-fall-sheet"
+      },
+      "fall6": {
+        "file": "assets/jumper/fall6.png",
+        "width": 345,
+        "height": 297,
+        "baselineY": 296,
+        "sourceAtlas": "jumper-fall-sheet"
+      },
+      "getup1": {
+        "file": "assets/jumper/getup1.png",
+        "width": 326,
+        "height": 118,
+        "baselineY": 117,
+        "sourceAtlas": "jumper-getup-sheet"
+      },
+      "getup2": {
+        "file": "assets/jumper/getup2.png",
+        "width": 362,
+        "height": 143,
+        "baselineY": 142,
+        "sourceAtlas": "jumper-getup-sheet"
+      },
+      "getup3": {
+        "file": "assets/jumper/getup3.png",
+        "width": 362,
+        "height": 188,
+        "baselineY": 187,
+        "sourceAtlas": "jumper-getup-sheet"
+      },
+      "getup4": {
+        "file": "assets/jumper/getup4.png",
+        "width": 362,
+        "height": 207,
+        "baselineY": 206,
+        "sourceAtlas": "jumper-getup-sheet"
+      },
+      "getup5": {
+        "file": "assets/jumper/getup5.png",
+        "width": 306,
+        "height": 208,
+        "baselineY": 207,
+        "sourceAtlas": "jumper-getup-sheet"
+      },
+      "getup6": {
+        "file": "assets/jumper/getup6.png",
+        "width": 352,
+        "height": 198,
+        "baselineY": 197,
+        "sourceAtlas": "jumper-getup-sheet"
+      },
+      "idle1": {
+        "file": "assets/jumper/idle1.png",
+        "width": 330,
+        "height": 256,
+        "baselineY": 255,
+        "sourceAtlas": "jumper-idle-sheet"
+      },
+      "idle2": {
+        "file": "assets/jumper/idle2.png",
+        "width": 325,
+        "height": 256,
+        "baselineY": 255,
+        "sourceAtlas": "jumper-idle-sheet"
+      },
+      "idle3": {
+        "file": "assets/jumper/idle3.png",
+        "width": 324,
+        "height": 256,
+        "baselineY": 255,
+        "sourceAtlas": "jumper-idle-sheet"
+      },
+      "idle4": {
+        "file": "assets/jumper/idle4.png",
+        "width": 323,
+        "height": 256,
+        "baselineY": 255,
+        "sourceAtlas": "jumper-idle-sheet"
+      },
+      "idle5": {
+        "file": "assets/jumper/idle5.png",
+        "width": 323,
+        "height": 276,
+        "baselineY": 275,
+        "sourceAtlas": "jumper-idle-sheet"
+      },
+      "idle6": {
+        "file": "assets/jumper/idle6.png",
+        "width": 322,
+        "height": 268,
+        "baselineY": 267,
+        "sourceAtlas": "jumper-idle-sheet"
+      },
+      "retreat1": {
+        "file": "assets/jumper/retreat1.png",
+        "width": 276,
+        "height": 574,
+        "baselineY": 573,
+        "sourceAtlas": "jumper-retreat-sheet"
+      },
+      "retreat2": {
+        "file": "assets/jumper/retreat2.png",
+        "width": 276,
+        "height": 585,
+        "baselineY": 584,
+        "sourceAtlas": "jumper-retreat-sheet"
+      },
+      "retreat3": {
+        "file": "assets/jumper/retreat3.png",
+        "width": 277,
+        "height": 572,
+        "baselineY": 571,
+        "sourceAtlas": "jumper-retreat-sheet"
+      },
+      "retreat4": {
+        "file": "assets/jumper/retreat4.png",
+        "width": 277,
+        "height": 381,
+        "baselineY": 380,
+        "sourceAtlas": "jumper-retreat-sheet"
+      },
+      "retreat5": {
+        "file": "assets/jumper/retreat5.png",
+        "width": 276,
+        "height": 380,
+        "baselineY": 379,
+        "sourceAtlas": "jumper-retreat-sheet"
+      },
+      "retreat6": {
+        "file": "assets/jumper/retreat6.png",
+        "width": 276,
+        "height": 178,
+        "baselineY": 177,
+        "sourceAtlas": "jumper-retreat-sheet"
+      },
+      "run1": {
+        "file": "assets/jumper/run1.png",
+        "width": 313,
+        "height": 179,
+        "baselineY": 178,
+        "sourceAtlas": "jumper-run-sheet"
+      },
+      "run2": {
+        "file": "assets/jumper/run2.png",
+        "width": 362,
+        "height": 155,
+        "baselineY": 154,
+        "sourceAtlas": "jumper-run-sheet"
+      },
+      "run3": {
+        "file": "assets/jumper/run3.png",
+        "width": 322,
+        "height": 212,
+        "baselineY": 211,
+        "sourceAtlas": "jumper-run-sheet"
+      },
+      "run4": {
+        "file": "assets/jumper/run4.png",
+        "width": 358,
+        "height": 185,
+        "baselineY": 184,
+        "sourceAtlas": "jumper-run-sheet"
+      },
+      "run5": {
+        "file": "assets/jumper/run5.png",
+        "width": 362,
+        "height": 182,
+        "baselineY": 181,
+        "sourceAtlas": "jumper-run-sheet"
+      },
+      "run6": {
+        "file": "assets/jumper/run6.png",
+        "width": 343,
+        "height": 180,
+        "baselineY": 179,
+        "sourceAtlas": "jumper-run-sheet"
+      },
+      "walk1": {
+        "file": "assets/jumper/walk1.png",
+        "width": 334,
+        "height": 221,
+        "baselineY": 220,
+        "sourceAtlas": "jumper-walk-sheet"
+      },
+      "walk2": {
+        "file": "assets/jumper/walk2.png",
+        "width": 339,
+        "height": 219,
+        "baselineY": 218,
+        "sourceAtlas": "jumper-walk-sheet"
+      },
+      "walk3": {
+        "file": "assets/jumper/walk3.png",
+        "width": 329,
+        "height": 209,
+        "baselineY": 208,
+        "sourceAtlas": "jumper-walk-sheet"
+      },
+      "walk4": {
+        "file": "assets/jumper/walk4.png",
+        "width": 358,
+        "height": 223,
+        "baselineY": 222,
+        "sourceAtlas": "jumper-walk-sheet"
+      },
+      "walk5": {
+        "file": "assets/jumper/walk5.png",
+        "width": 296,
+        "height": 223,
+        "baselineY": 222,
+        "sourceAtlas": "jumper-walk-sheet"
+      },
+      "walk6": {
+        "file": "assets/jumper/walk6.png",
+        "width": 351,
+        "height": 203,
+        "baselineY": 202,
+        "sourceAtlas": "jumper-walk-sheet"
+      }
+    },
+    "boundingBox": {
+      "width": 362,
+      "height": 585
+    }
+  },
+  "traversal": {
+    "type": "character",
+    "frames": {
+      "ladder-mid": {
+        "file": "assets/traversal/ladder-mid.png",
+        "width": 216,
+        "height": 265,
+        "baselineY": 264,
+        "sourceAtlas": "ladder-and-traversal-sheet"
+      },
+      "ladder-bottom": {
+        "file": "assets/traversal/ladder-bottom.png",
+        "width": 362,
+        "height": 259,
+        "baselineY": 258,
+        "sourceAtlas": "ladder-and-traversal-sheet"
+      },
+      "ladder-top": {
+        "file": "assets/traversal/ladder-top.png",
+        "width": 362,
+        "height": 269,
+        "baselineY": 268,
+        "sourceAtlas": "ladder-and-traversal-sheet"
+      },
+      "catwalk": {
+        "file": "assets/traversal/catwalk.png",
+        "width": 362,
+        "height": 158,
+        "baselineY": 157,
+        "sourceAtlas": "ladder-and-traversal-sheet"
+      },
+      "plank-floor": {
+        "file": "assets/traversal/plank-floor.png",
+        "width": 362,
+        "height": 159,
+        "baselineY": 158,
+        "sourceAtlas": "ladder-and-traversal-sheet"
+      },
+      "hatch": {
+        "file": "assets/traversal/hatch.png",
+        "width": 309,
+        "height": 145,
+        "baselineY": 144,
+        "sourceAtlas": "ladder-and-traversal-sheet"
+      }
+    },
+    "boundingBox": {
+      "width": 362,
+      "height": 269
+    }
+  },
+  "materials": {
+    "type": "character",
+    "frames": {
+      "wire": {
+        "file": "assets/materials/wire.png",
+        "width": 282,
+        "height": 268,
+        "baselineY": 267,
+        "sourceAtlas": "materials-sheet"
+      },
+      "glass": {
+        "file": "assets/materials/glass.png",
+        "width": 362,
+        "height": 318,
+        "baselineY": 317,
+        "sourceAtlas": "materials-sheet"
+      },
+      "battery": {
+        "file": "assets/materials/battery.png",
+        "width": 362,
+        "height": 353,
+        "baselineY": 352,
+        "sourceAtlas": "materials-sheet"
+      },
+      "tape": {
+        "file": "assets/materials/tape.png",
+        "width": 362,
+        "height": 297,
+        "baselineY": 296,
+        "sourceAtlas": "materials-sheet"
+      },
+      "keycard": {
+        "file": "assets/materials/keycard.png",
+        "width": 330,
+        "height": 281,
+        "baselineY": 280,
+        "sourceAtlas": "materials-sheet"
+      },
+      "fuse": {
+        "file": "assets/materials/fuse.png",
+        "width": 240,
+        "height": 322,
+        "baselineY": 321,
+        "sourceAtlas": "materials-sheet"
+      }
+    },
+    "boundingBox": {
+      "width": 362,
+      "height": 353
+    }
   },
   "monster": {
     "type": "character",
@@ -530,6 +1268,387 @@
     "boundingBox": {
       "width": 434,
       "height": 418
+    }
+  },
+  "shade-tape": {
+    "type": "character",
+    "frames": {
+      "shade1": {
+        "file": "assets/shade-tape/shade1.png",
+        "width": 325,
+        "height": 363,
+        "baselineY": 362,
+        "sourceAtlas": "shade-and-tape-sheet"
+      },
+      "shade2": {
+        "file": "assets/shade-tape/shade2.png",
+        "width": 362,
+        "height": 476,
+        "baselineY": 475,
+        "sourceAtlas": "shade-and-tape-sheet"
+      },
+      "shade3": {
+        "file": "assets/shade-tape/shade3.png",
+        "width": 362,
+        "height": 322,
+        "baselineY": 321,
+        "sourceAtlas": "shade-and-tape-sheet"
+      },
+      "recorder": {
+        "file": "assets/shade-tape/recorder.png",
+        "width": 339,
+        "height": 412,
+        "baselineY": 411,
+        "sourceAtlas": "shade-and-tape-sheet"
+      },
+      "recorder-active": {
+        "file": "assets/shade-tape/recorder-active.png",
+        "width": 283,
+        "height": 412,
+        "baselineY": 411,
+        "sourceAtlas": "shade-and-tape-sheet"
+      },
+      "recorder-finished": {
+        "file": "assets/shade-tape/recorder-finished.png",
+        "width": 266,
+        "height": 412,
+        "baselineY": 411,
+        "sourceAtlas": "shade-and-tape-sheet"
+      }
+    },
+    "boundingBox": {
+      "width": 362,
+      "height": 476
+    }
+  },
+  "smokebomb": {
+    "type": "character",
+    "frames": {
+      "idle": {
+        "file": "assets/smokebomb/idle.png",
+        "width": 124,
+        "height": 253,
+        "baselineY": 252,
+        "sourceAtlas": "smokebomb-sheet"
+      },
+      "ignited": {
+        "file": "assets/smokebomb/ignited.png",
+        "width": 112,
+        "height": 303,
+        "baselineY": 302,
+        "sourceAtlas": "smokebomb-sheet"
+      },
+      "smoke1": {
+        "file": "assets/smokebomb/smoke1.png",
+        "width": 338,
+        "height": 500,
+        "baselineY": 499,
+        "sourceAtlas": "smokebomb-sheet"
+      },
+      "smoke2": {
+        "file": "assets/smokebomb/smoke2.png",
+        "width": 362,
+        "height": 609,
+        "baselineY": 608,
+        "sourceAtlas": "smokebomb-sheet"
+      },
+      "smoke3": {
+        "file": "assets/smokebomb/smoke3.png",
+        "width": 360,
+        "height": 653,
+        "baselineY": 652,
+        "sourceAtlas": "smokebomb-sheet"
+      },
+      "dissipating": {
+        "file": "assets/smokebomb/dissipating.png",
+        "width": 286,
+        "height": 531,
+        "baselineY": 530,
+        "sourceAtlas": "smokebomb-sheet"
+      }
+    },
+    "boundingBox": {
+      "width": 362,
+      "height": 653
+    }
+  },
+  "vents": {
+    "type": "character",
+    "frames": {
+      "closed": {
+        "file": "assets/vents/closed.png",
+        "width": 327,
+        "height": 298,
+        "baselineY": 297,
+        "sourceAtlas": "vents-sheet"
+      },
+      "eyes": {
+        "file": "assets/vents/eyes.png",
+        "width": 322,
+        "height": 298,
+        "baselineY": 297,
+        "sourceAtlas": "vents-sheet"
+      },
+      "drip": {
+        "file": "assets/vents/drip.png",
+        "width": 322,
+        "height": 318,
+        "baselineY": 317,
+        "sourceAtlas": "vents-sheet"
+      },
+      "bent": {
+        "file": "assets/vents/bent.png",
+        "width": 323,
+        "height": 298,
+        "baselineY": 297,
+        "sourceAtlas": "vents-sheet"
+      },
+      "open": {
+        "file": "assets/vents/open.png",
+        "width": 324,
+        "height": 298,
+        "baselineY": 297,
+        "sourceAtlas": "vents-sheet"
+      },
+      "sealed": {
+        "file": "assets/vents/sealed.png",
+        "width": 318,
+        "height": 298,
+        "baselineY": 297,
+        "sourceAtlas": "vents-sheet"
+      }
+    },
+    "boundingBox": {
+      "width": 327,
+      "height": 318
+    }
+  },
+  "whisperer": {
+    "type": "character",
+    "frames": {
+      "fade1": {
+        "file": "assets/whisperer/fade1.png",
+        "width": 207,
+        "height": 603,
+        "baselineY": 602,
+        "sourceAtlas": "whisperer-fade-sheet"
+      },
+      "fade2": {
+        "file": "assets/whisperer/fade2.png",
+        "width": 207,
+        "height": 642,
+        "baselineY": 641,
+        "sourceAtlas": "whisperer-fade-sheet"
+      },
+      "fade3": {
+        "file": "assets/whisperer/fade3.png",
+        "width": 203,
+        "height": 623,
+        "baselineY": 622,
+        "sourceAtlas": "whisperer-fade-sheet"
+      },
+      "fade4": {
+        "file": "assets/whisperer/fade4.png",
+        "width": 198,
+        "height": 597,
+        "baselineY": 596,
+        "sourceAtlas": "whisperer-fade-sheet"
+      },
+      "fade5": {
+        "file": "assets/whisperer/fade5.png",
+        "width": 195,
+        "height": 615,
+        "baselineY": 614,
+        "sourceAtlas": "whisperer-fade-sheet"
+      },
+      "fade6": {
+        "file": "assets/whisperer/fade6.png",
+        "width": 175,
+        "height": 534,
+        "baselineY": 533,
+        "sourceAtlas": "whisperer-fade-sheet"
+      },
+      "glide1": {
+        "file": "assets/whisperer/glide1.png",
+        "width": 181,
+        "height": 582,
+        "baselineY": 581,
+        "sourceAtlas": "whisperer-glide-sheet"
+      },
+      "glide2": {
+        "file": "assets/whisperer/glide2.png",
+        "width": 201,
+        "height": 586,
+        "baselineY": 585,
+        "sourceAtlas": "whisperer-glide-sheet"
+      },
+      "glide3": {
+        "file": "assets/whisperer/glide3.png",
+        "width": 248,
+        "height": 586,
+        "baselineY": 585,
+        "sourceAtlas": "whisperer-glide-sheet"
+      },
+      "glide4": {
+        "file": "assets/whisperer/glide4.png",
+        "width": 262,
+        "height": 582,
+        "baselineY": 581,
+        "sourceAtlas": "whisperer-glide-sheet"
+      },
+      "glide5": {
+        "file": "assets/whisperer/glide5.png",
+        "width": 197,
+        "height": 588,
+        "baselineY": 587,
+        "sourceAtlas": "whisperer-glide-sheet"
+      },
+      "glide6": {
+        "file": "assets/whisperer/glide6.png",
+        "width": 184,
+        "height": 584,
+        "baselineY": 583,
+        "sourceAtlas": "whisperer-glide-sheet"
+      },
+      "idle1": {
+        "file": "assets/whisperer/idle1.png",
+        "width": 208,
+        "height": 624,
+        "baselineY": 623,
+        "sourceAtlas": "whisperer-idle-sheet"
+      },
+      "idle2": {
+        "file": "assets/whisperer/idle2.png",
+        "width": 219,
+        "height": 640,
+        "baselineY": 639,
+        "sourceAtlas": "whisperer-idle-sheet"
+      },
+      "idle3": {
+        "file": "assets/whisperer/idle3.png",
+        "width": 194,
+        "height": 613,
+        "baselineY": 612,
+        "sourceAtlas": "whisperer-idle-sheet"
+      },
+      "idle4": {
+        "file": "assets/whisperer/idle4.png",
+        "width": 197,
+        "height": 621,
+        "baselineY": 620,
+        "sourceAtlas": "whisperer-idle-sheet"
+      },
+      "idle5": {
+        "file": "assets/whisperer/idle5.png",
+        "width": 213,
+        "height": 631,
+        "baselineY": 630,
+        "sourceAtlas": "whisperer-idle-sheet"
+      },
+      "idle6": {
+        "file": "assets/whisperer/idle6.png",
+        "width": 196,
+        "height": 627,
+        "baselineY": 626,
+        "sourceAtlas": "whisperer-idle-sheet"
+      },
+      "spawn1": {
+        "file": "assets/whisperer/spawn1.png",
+        "width": 80,
+        "height": 294,
+        "baselineY": 293,
+        "sourceAtlas": "whisperer-spawn-sheet"
+      },
+      "spawn2": {
+        "file": "assets/whisperer/spawn2.png",
+        "width": 194,
+        "height": 614,
+        "baselineY": 613,
+        "sourceAtlas": "whisperer-spawn-sheet"
+      },
+      "spawn3": {
+        "file": "assets/whisperer/spawn3.png",
+        "width": 173,
+        "height": 620,
+        "baselineY": 619,
+        "sourceAtlas": "whisperer-spawn-sheet"
+      },
+      "spawn4": {
+        "file": "assets/whisperer/spawn4.png",
+        "width": 195,
+        "height": 641,
+        "baselineY": 640,
+        "sourceAtlas": "whisperer-spawn-sheet"
+      },
+      "spawn5": {
+        "file": "assets/whisperer/spawn5.png",
+        "width": 318,
+        "height": 669,
+        "baselineY": 668,
+        "sourceAtlas": "whisperer-spawn-sheet"
+      },
+      "spawn6": {
+        "file": "assets/whisperer/spawn6.png",
+        "width": 247,
+        "height": 674,
+        "baselineY": 673,
+        "sourceAtlas": "whisperer-spawn-sheet"
+      }
+    },
+    "boundingBox": {
+      "width": 318,
+      "height": 674
+    }
+  },
+  "workbench": {
+    "type": "character",
+    "frames": {
+      "bench": {
+        "file": "assets/workbench/bench.png",
+        "width": 321,
+        "height": 297,
+        "baselineY": 296,
+        "sourceAtlas": "workbench-and-craft-sheet"
+      },
+      "bench-glow": {
+        "file": "assets/workbench/bench-glow.png",
+        "width": 362,
+        "height": 296,
+        "baselineY": 295,
+        "sourceAtlas": "workbench-and-craft-sheet"
+      },
+      "crafting": {
+        "file": "assets/workbench/crafting.png",
+        "width": 362,
+        "height": 365,
+        "baselineY": 364,
+        "sourceAtlas": "workbench-and-craft-sheet"
+      },
+      "finished-item": {
+        "file": "assets/workbench/finished-item.png",
+        "width": 362,
+        "height": 312,
+        "baselineY": 311,
+        "sourceAtlas": "workbench-and-craft-sheet"
+      },
+      "tool-rack": {
+        "file": "assets/workbench/tool-rack.png",
+        "width": 349,
+        "height": 275,
+        "baselineY": 274,
+        "sourceAtlas": "workbench-and-craft-sheet"
+      },
+      "crate": {
+        "file": "assets/workbench/crate.png",
+        "width": 310,
+        "height": 345,
+        "baselineY": 344,
+        "sourceAtlas": "workbench-and-craft-sheet"
+      }
+    },
+    "boundingBox": {
+      "width": 362,
+      "height": 365
     }
   }
 }

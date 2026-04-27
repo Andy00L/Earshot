@@ -151,4 +151,251 @@ ATLAS_PROFILES = {
         "frames": ["gameover"],
         "chroma_key": False,
     },
+
+    # ── Jumper character (8 atlases, one entity) ─────────────────────────
+
+    "jumper-emerge-sheet.png": {
+        "type": "fixed_cell_strip",
+        "entity": "jumper",
+        "frame_count": 6,
+        "frames": ["emerge1", "emerge2", "emerge3", "emerge4", "emerge5", "emerge6"],
+        "chroma_key": True,
+    },
+    "jumper-fall-sheet.png": {
+        "type": "fixed_cell_strip",
+        "entity": "jumper",
+        "frame_count": 6,
+        "frames": ["fall1", "fall2", "fall3", "fall4", "fall5", "fall6"],
+        "chroma_key": True,
+    },
+    "jumper-walk-sheet.png": {
+        "type": "fixed_cell_strip",
+        "entity": "jumper",
+        "frame_count": 6,
+        "frames": ["walk1", "walk2", "walk3", "walk4", "walk5", "walk6"],
+        "chroma_key": True,
+    },
+    "jumper-run-sheet.png": {
+        "type": "fixed_cell_strip",
+        "entity": "jumper",
+        "frame_count": 6,
+        "frames": ["run1", "run2", "run3", "run4", "run5", "run6"],
+        "chroma_key": True,
+    },
+    "jumper-attack-sheet.png": {
+        "type": "fixed_cell_strip",
+        "entity": "jumper",
+        "frame_count": 6,
+        "frames": ["attack1", "attack2", "attack3", "attack4", "attack5", "attack6"],
+        "chroma_key": True,
+    },
+    "jumper-getup-sheet.png": {
+        "type": "fixed_cell_strip",
+        "entity": "jumper",
+        "frame_count": 6,
+        "frames": ["getup1", "getup2", "getup3", "getup4", "getup5", "getup6"],
+        "chroma_key": True,
+    },
+    "jumper-retreat-sheet.png": {
+        "type": "fixed_cell_strip",
+        "entity": "jumper",
+        "frame_count": 6,
+        "frames": ["retreat1", "retreat2", "retreat3", "retreat4", "retreat5", "retreat6"],
+        "chroma_key": True,
+    },
+    "jumper-idle-sheet.png": {
+        "type": "fixed_cell_strip",
+        "entity": "jumper",
+        "frame_count": 6,
+        "frames": ["idle1", "idle2", "idle3", "idle4", "idle5", "idle6"],
+        "chroma_key": True,
+    },
+
+    # ── Whisperer character (4 atlases, one entity) ──────────────────────
+
+    "whisperer-spawn-sheet.png": {
+        "type": "fixed_cell_strip",
+        "entity": "whisperer",
+        "frame_count": 6,
+        "frames": ["spawn1", "spawn2", "spawn3", "spawn4", "spawn5", "spawn6"],
+        "chroma_key": True,
+    },
+    "whisperer-idle-sheet.png": {
+        "type": "fixed_cell_strip",
+        "entity": "whisperer",
+        "frame_count": 6,
+        "frames": ["idle1", "idle2", "idle3", "idle4", "idle5", "idle6"],
+        "chroma_key": True,
+    },
+    "whisperer-glide-sheet.png": {
+        "type": "fixed_cell_strip",
+        "entity": "whisperer",
+        "frame_count": 6,
+        "frames": ["glide1", "glide2", "glide3", "glide4", "glide5", "glide6"],
+        "chroma_key": True,
+    },
+    "whisperer-fade-sheet.png": {
+        "type": "fixed_cell_strip",
+        "entity": "whisperer",
+        "frame_count": 6,
+        "frames": ["fade1", "fade2", "fade3", "fade4", "fade5", "fade6"],
+        "chroma_key": True,
+    },
+
+    # ── Environment sprite sheets (10 atlases) ──────────────────────────
+
+    "vents-sheet.png": {
+        "type": "fixed_cell_strip",
+        "entity": "vents",
+        "frame_count": 6,
+        "frames": ["closed", "eyes", "drip", "bent", "open", "sealed"],
+        "chroma_key": True,
+    },
+    "ladder-and-traversal-sheet.png": {
+        "type": "fixed_cell_strip",
+        "entity": "traversal",
+        "frame_count": 6,
+        "frames": ["ladder-mid", "ladder-bottom", "ladder-top", "catwalk", "plank-floor", "hatch"],
+        "chroma_key": True,
+    },
+    "workbench-and-craft-sheet.png": {
+        "type": "fixed_cell_strip",
+        "entity": "workbench",
+        "frame_count": 6,
+        "frames": ["bench", "bench-glow", "crafting", "finished-item", "tool-rack", "crate"],
+        "chroma_key": True,
+    },
+    "bookshelves-sheet.png": {
+        "type": "fixed_cell_strip",
+        "entity": "bookshelves",
+        "frame_count": 6,
+        "frames": ["normal", "fake", "ajar-30", "ajar-90", "cabinet", "storage-rack"],
+        "chroma_key": True,
+    },
+    "shade-and-tape-sheet.png": {
+        "type": "fixed_cell_strip",
+        "entity": "shade-tape",
+        "frame_count": 6,
+        "frames": ["shade1", "shade2", "shade3", "recorder", "recorder-active", "recorder-finished"],
+        "chroma_key": True,
+    },
+    "materials-sheet.png": {
+        "type": "fixed_cell_strip",
+        "entity": "materials",
+        "frame_count": 6,
+        "frames": ["wire", "glass", "battery", "tape", "keycard", "fuse"],
+        "chroma_key": True,
+    },
+    "flare-sheet.png": {
+        "type": "fixed_cell_strip",
+        "entity": "flare",
+        "frame_count": 6,
+        "frames": ["unlit", "igniting", "burn1", "burn2", "dying", "burnt-out"],
+        "chroma_key": True,
+    },
+    "smokebomb-sheet.png": {
+        "type": "fixed_cell_strip",
+        "entity": "smokebomb",
+        "frame_count": 6,
+        "frames": ["idle", "ignited", "smoke1", "smoke2", "smoke3", "dissipating"],
+        "chroma_key": True,
+    },
+    "decoy-radio-sheet.png": {
+        "type": "fixed_cell_strip",
+        "entity": "decoy-radio",
+        "frame_count": 6,
+        "frames": ["idle", "armed", "broadcasting1", "broadcasting2", "peak", "spent"],
+        "chroma_key": True,
+    },
+    "cubicle-dividers-sheet.png": {
+        "type": "fixed_cell_strip",
+        "entity": "cubicle-dividers",
+        "frame_count": 6,
+        "frames": ["straight", "straight-damaged", "l-corner", "l-corner-damaged", "half-height", "gap"],
+        "chroma_key": True,
+    },
+
+    # ── UI elements (single chroma-keyed sprites) ────────────────────────
+
+    "beacon-meter-frame.png": {
+        "type": "single_chroma",
+        "entity": "ui",
+        "frames": ["beacon-meter-frame"],
+        "chroma_key": True,
+    },
+    "beacon-meter-fill.png": {
+        "type": "single_chroma",
+        "entity": "ui",
+        "frames": ["beacon-meter-fill"],
+        "chroma_key": True,
+    },
+    "inventory-slot-empty.png": {
+        "type": "single_chroma",
+        "entity": "ui",
+        "frames": ["inventory-slot-empty"],
+        "chroma_key": True,
+    },
+    "inventory-slot-selected.png": {
+        "type": "single_chroma",
+        "entity": "ui",
+        "frames": ["inventory-slot-selected"],
+        "chroma_key": True,
+    },
+    "craft-menu-bg.png": {
+        "type": "single_chroma",
+        "entity": "ui",
+        "frames": ["craft-menu-bg"],
+        "chroma_key": True,
+    },
+    "craft-button-available.png": {
+        "type": "single_chroma",
+        "entity": "ui",
+        "frames": ["craft-button-available"],
+        "chroma_key": True,
+    },
+    "craft-button-locked.png": {
+        "type": "single_chroma",
+        "entity": "ui",
+        "frames": ["craft-button-locked"],
+        "chroma_key": True,
+    },
+    "minimap-frame.png": {
+        "type": "single_chroma",
+        "entity": "ui",
+        "frames": ["minimap-frame"],
+        "chroma_key": True,
+    },
+    "minimap-room-tile.png": {
+        "type": "single_chroma",
+        "entity": "ui",
+        "frames": ["minimap-room-tile"],
+        "chroma_key": True,
+    },
+    "minimap-player-dot.png": {
+        "type": "single_chroma",
+        "entity": "ui",
+        "frames": ["minimap-player-dot"],
+        "chroma_key": True,
+    },
+    "flare-light-overlay.png": {
+        "type": "single_chroma",
+        "entity": "ui",
+        "frames": ["flare-light-overlay"],
+        "chroma_key": True,
+    },
+
+    # ── New full-scene backgrounds ───────────────────────────────────────
+
+    "archives-bg.png": {
+        "type": "background",
+        "entity": "archives",
+        "frames": ["archives"],
+        "chroma_key": False,
+    },
+    "server-room-upper-bg.png": {
+        "type": "background",
+        "entity": "server-upper",
+        "frames": ["server-upper"],
+        "chroma_key": False,
+    },
 }

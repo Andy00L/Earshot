@@ -90,7 +90,8 @@ Eleven labs/
     mic.ts                 MicAnalyser singleton (Web Audio)
     suspicion.ts           rmsToSuspicionPerSec(), suspicionDeltaForFrame()
     tts.ts                 synthesizeTTS() (ElevenLabs POST)
-    hud.ts                 HUD class (Pixi text overlays)
+    hud.ts                 HUD class (Pixi text overlays, hosts Minimap)
+    minimap.ts             Minimap class (parchment sprites, visited tracking, player dot pulse)
     flashlight.ts          Flashlight class (canvas radial gradient)
     vignette.ts            Vignette class (Pixi graphics)
     screen-shake.ts        ScreenShake class (random offset + decay)
@@ -215,6 +216,7 @@ graph LR
         C_ITEMS[Keycard pickup]
         C_HIDE[2 desks, 1 locker]
         C_RADIO[Radio on table]
+        C_FG[7 foreground dividers<br>maze occlusion]
     end
 
     subgraph Server
@@ -223,12 +225,14 @@ graph LR
         S_ITEMS[Breaker switch]
         S_HIDE[2 lockers]
         S_RADIO[Radio on table]
+        S_UPPER[Upper floor<br>ladder x=1400]
     end
 
     subgraph Stairwell
         ST_DOOR_L[Door to Server<br>press_e]
         ST_EXIT[Exit door<br>requires keycard]
         ST_HIDE[1 desk]
+        ST_ALL[All 3 monsters<br>Listener+Jumper+Whisperer]
     end
 
     Reception --> Cubicles
@@ -244,8 +248,23 @@ Each `RoomDefinition` contains:
 - `doors[]`: position, target room, requirement (none, press_e, keycard, breaker_on)
 - `pickups[]`: item definitions
 - `hidingSpots[]`: locker/desk definitions with position and trigger width
-- `decorativeProps[]`: visual-only props
+- `decorativeProps[]`: visual-only props (zIndex 0, rendered in room container)
+- `foregroundProps[]`: props rendered ABOVE the player (zIndex 80 in world container). Used by Cubicles for maze dividers
 - `radioPickups[]`: radio item definitions
+- `upperBg`, `upperFloorY`, `upperFloorXMin`, `upperFloorXMax`, `ladders[]`: vertical traversal (Server room only). Player enters CLIMBING state via W/S near ladder x. Upper-bg is a Sprite positioned at `upperFloorXMin`; the catwalk walking surface is a TilingSprite of `traversal:catwalk` tiled across the upper floor width
+- `whispererSpawnChance`: per-room override of Whisperer spawn probability (default 0.30, Stairwell uses 0.40)
+
+#### Rendering layers (world container, sortableChildren=true)
+
+| zIndex | Content |
+|--------|---------|
+| 0 | Room background, decorative props, door sprites |
+| 5 | Upper floor background (Server) |
+| 10 | Catwalk surface strip (TilingSprite, Server upper floor) |
+| 30 | Ladder sprites |
+| 50 | Player |
+| 55 | Hatch sprite (above player at ladder top) |
+| 80 | Foreground props (cubicle dividers) |
 
 ### audio.ts (AudioManager)
 
@@ -307,6 +326,34 @@ The suspicion curve in `suspicion.ts` was calibrated against observed RMS values
 - Returns: Blob URL for Howler playback
 
 The API key (`__ELEVENLABS_API_KEY__`) is injected by Vite's `define` at build time from `.env`. This means the key is in the client bundle. The code includes a security warning about this.
+
+### minimap.ts (Parchment Minimap)
+
+The `Minimap` class renders a 5-room hub-and-spokes layout inside a parchment frame in the top-right corner of the HUD. It uses three atlas sprites from `assets/ui/`:
+
+- `minimap-frame` (834x645 source, displayed at 240x180): parchment background with golden corners.
+- `minimap-room-tile` (226x154 source, displayed at 36x26): one per room, tinted white (visited) or 0x666666 at 0.45 alpha (unvisited).
+- `minimap-player-dot` (52x49 source, displayed at 14x14): pulsing white dot centered on the current room tile. Oscillates scale 1.0 to 1.15 over 1200ms via sin wave.
+
+Room positions are normalized within the frame's inner area (directional insets measured per-edge from `minimap-frame.png` alpha, see `FRAME_INSET_*_PCT` constants in `src/minimap.ts`):
+
+| Room | Position | Role |
+|------|----------|------|
+| Stairwell | (0.50, 0.18) | Top center |
+| Cubicles | (0.20, 0.50) | Middle left |
+| Server | (0.50, 0.50) | Hub (center) |
+| Archives | (0.80, 0.50) | Middle right |
+| Reception | (0.50, 0.85) | Bottom center |
+
+Connection lines between adjacent rooms are drawn once at construction using Pixi Graphics (2px stroke, color 0x88684a). The vent shortcut (Cubicles to Stairwell) is not drawn.
+
+Visibility is gated by `GameState.hasMapFragment`. The minimap fades in over 600ms when the Map Fragment is picked up in Archives. Map fragment pickup triggers TTS narration via the Phase 7 lore tape pipeline (`tape_map_fragment` catalog entry, Adam voice, subtitle computed from Howl duration + 500ms tail).
+
+**Map fragment lifecycle.** The map fragment is classified as a quest item, distinct from inventory materials. It persists through death by design (Phase 9D Issue 2, decision A). The minimap, gated by `hasMapFragment`, remains visible across deaths. Death costs time and inventory, but not knowledge.
+
+**Visited room persistence.** The minimap's `visitedRooms` set persists across deaths and only resets on full game restart (Phase 9D Issue 4, decision A). On full game restart (new Game instance), all state resets.
+
+Visited rooms are tracked via `Set<RoomId>`, updated every frame by `onRoomEnter()` (called from `HUD.updateMinimap()`). This tracks room visits even before the minimap becomes visible, so when the player picks up the map fragment, all previously visited rooms are already marked. Server upper floor does not affect the minimap; the player dot stays on the Server tile regardless of floor.
 
 ### flashlight.ts + vignette.ts (Atmosphere)
 

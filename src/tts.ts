@@ -46,9 +46,19 @@ export async function synthesizeTTS(
 
   if (!response.ok) {
     const errorText = await response.text().catch(() => "unknown");
-    throw new Error(
-      `ElevenLabs TTS ${response.status}: ${errorText.slice(0, 100)}`,
-    );
+    if (response.status === 401) {
+      throw new Error("TTS auth failed. Check ELEVENLABS_API_KEY in .env.");
+    }
+    if (response.status === 422) {
+      throw new Error(`TTS rejected input: ${errorText.slice(0, 100)}`);
+    }
+    if (response.status === 429) {
+      throw new Error("TTS rate limited. Wait before next radio bait.");
+    }
+    if (response.status >= 500) {
+      throw new Error(`TTS service error (${response.status}). Try again.`);
+    }
+    throw new Error(`TTS unexpected status ${response.status}: ${errorText.slice(0, 100)}`);
   }
 
   const blob = await response.blob();

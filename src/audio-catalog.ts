@@ -1,8 +1,11 @@
+import { LoreTapeId } from "./types";
+
 export type AmbientId =
   | "reception_ambient"
   | "cubicles_ambient"
   | "server_ambient"
-  | "stairwell_ambient";
+  | "stairwell_ambient"
+  | "archives_ambient";
 
 export type MonsterVocalId =
   | "monster_patrol_breath"
@@ -38,16 +41,35 @@ export type RadioVoiceId =
   | "radio_breaker_hint"
   | "radio_exit_hint";
 
-export type AudioId = AmbientId | MonsterVocalId | MonsterConfusedVocalId | SfxId | RadioVoiceId;
+export type WhispererVoiceId =
+  | "whisper_01" | "whisper_02" | "whisper_03" | "whisper_04"
+  | "whisper_05" | "whisper_06" | "whisper_07" | "whisper_08"
+  | "whisper_fade";
+
+export type TutorialId = "tutorial_t0" | "tutorial_t1" | "tutorial_t2" | "tutorial_t3";
+
+export type MapNarrationId = "tape_map_fragment";
+
+export type AudioId = AmbientId | MonsterVocalId | MonsterConfusedVocalId | SfxId | RadioVoiceId | WhispererVoiceId | LoreTapeId | TutorialId | MapNarrationId;
+
+export interface WhispererVoiceSettings {
+  stability: number;
+  similarity_boost: number;
+  style: number;
+  use_speaker_boost: boolean;
+}
 
 export interface AudioAsset {
   id: AudioId;
-  category: "ambient" | "monster_vocal" | "sfx" | "radio_voice";
+  category: "ambient" | "monster_vocal" | "sfx" | "radio_voice" | "whisperer_voice" | "lore_tape";
   prompt: string;
   durationSec?: number;
   loop: boolean;
   volume: number;
   isMusic?: boolean;
+  voiceId?: string;
+  modelId?: string;
+  voiceSettings?: WhispererVoiceSettings;
 }
 
 export const AUDIO_CATALOG: Record<AudioId, AudioAsset> = {
@@ -80,6 +102,14 @@ export const AUDIO_CATALOG: Record<AudioId, AudioAsset> = {
     id: "stairwell_ambient",
     category: "ambient",
     prompt: "Dread ambient drone for a concrete stairwell, building tension. Low cello sustains, distant metallic creaks. Heavy, foreboding. Loop seamlessly. Instrumental only.",
+    loop: true,
+    volume: 0.5,
+    isMusic: true,
+  },
+  archives_ambient: {
+    id: "archives_ambient",
+    category: "ambient",
+    prompt: "Deep oppressive ambient drone for an abandoned underground archive, paper rustling, distant slow drips of water, low resonant hum, claustrophobic, isolating, no melody, dark cinematic, instrumental only, loops seamlessly",
     loop: true,
     volume: 0.5,
     isMusic: true,
@@ -273,17 +303,15 @@ export const AUDIO_CATALOG: Record<AudioId, AudioAsset> = {
   static_burst: {
     id: "static_burst",
     category: "sfx",
-    prompt: "Harsh radio static burst with brief feedback squeal. About 1.5 seconds.",
+    prompt: "Short burst of harsh radio static followed by a brief electronic feedback squeal, 1.5 to 2 seconds, distorted, no music, sudden, abrasive",
     durationSec: 2,
     loop: false,
-    volume: 0.9,
-    // TODO: source this asset before demo. ~1-2s of harsh radio static.
-    // Used as fallback when TTS API fails or times out.
+    volume: 0.7,
   },
   radio_throw: {
     id: "radio_throw",
     category: "sfx",
-    prompt: "Small object tossed through the air and landing with a clatter. About 0.6 seconds.",
+    prompt: "Short whoosh of a small object thrown through the air, ending with a soft thud as it lands on a hard floor, 1 second, no music, no voice",
     durationSec: 1,
     loop: false,
     volume: 0.5,
@@ -318,4 +346,230 @@ export const AUDIO_CATALOG: Record<AudioId, AudioAsset> = {
     loop: false,
     volume: 0.8,
   },
+
+  // WHISPERER VOICE (TTS - eerie female whisper)
+  whisper_01: {
+    id: "whisper_01",
+    category: "whisperer_voice",
+    prompt: "behind you",
+    loop: false,
+    volume: 0.6,
+    voiceId: "EXAVITQu4vr4xnSDxMaL",
+    modelId: "eleven_turbo_v2_5",
+    voiceSettings: { stability: 0.3, similarity_boost: 0.6, style: 0.9, use_speaker_boost: true },
+  },
+  whisper_02: {
+    id: "whisper_02",
+    category: "whisperer_voice",
+    prompt: "i can see you",
+    loop: false,
+    volume: 0.6,
+    voiceId: "EXAVITQu4vr4xnSDxMaL",
+    modelId: "eleven_turbo_v2_5",
+    voiceSettings: { stability: 0.3, similarity_boost: 0.6, style: 0.9, use_speaker_boost: true },
+  },
+  whisper_03: {
+    id: "whisper_03",
+    category: "whisperer_voice",
+    prompt: "stay still",
+    loop: false,
+    volume: 0.6,
+    voiceId: "EXAVITQu4vr4xnSDxMaL",
+    modelId: "eleven_turbo_v2_5",
+    voiceSettings: { stability: 0.3, similarity_boost: 0.6, style: 0.9, use_speaker_boost: true },
+  },
+  whisper_04: {
+    id: "whisper_04",
+    category: "whisperer_voice",
+    prompt: "closer now",
+    loop: false,
+    volume: 0.6,
+    voiceId: "EXAVITQu4vr4xnSDxMaL",
+    modelId: "eleven_turbo_v2_5",
+    voiceSettings: { stability: 0.3, similarity_boost: 0.6, style: 0.9, use_speaker_boost: true },
+  },
+  whisper_05: {
+    id: "whisper_05",
+    category: "whisperer_voice",
+    prompt: "you're not alone",
+    loop: false,
+    volume: 0.6,
+    voiceId: "EXAVITQu4vr4xnSDxMaL",
+    modelId: "eleven_turbo_v2_5",
+    voiceSettings: { stability: 0.3, similarity_boost: 0.6, style: 0.9, use_speaker_boost: true },
+  },
+  whisper_06: {
+    id: "whisper_06",
+    category: "whisperer_voice",
+    prompt: "look at me",
+    loop: false,
+    volume: 0.6,
+    voiceId: "EXAVITQu4vr4xnSDxMaL",
+    modelId: "eleven_turbo_v2_5",
+    voiceSettings: { stability: 0.3, similarity_boost: 0.6, style: 0.9, use_speaker_boost: true },
+  },
+  whisper_07: {
+    id: "whisper_07",
+    category: "whisperer_voice",
+    prompt: "where are you going",
+    loop: false,
+    volume: 0.6,
+    voiceId: "EXAVITQu4vr4xnSDxMaL",
+    modelId: "eleven_turbo_v2_5",
+    voiceSettings: { stability: 0.3, similarity_boost: 0.6, style: 0.9, use_speaker_boost: true },
+  },
+  whisper_08: {
+    id: "whisper_08",
+    category: "whisperer_voice",
+    prompt: "we hear everything",
+    loop: false,
+    volume: 0.6,
+    voiceId: "EXAVITQu4vr4xnSDxMaL",
+    modelId: "eleven_turbo_v2_5",
+    voiceSettings: { stability: 0.3, similarity_boost: 0.6, style: 0.9, use_speaker_boost: true },
+  },
+  whisper_fade: {
+    id: "whisper_fade",
+    category: "whisperer_voice",
+    prompt: "you saw me",
+    loop: false,
+    volume: 0.8,
+    voiceId: "EXAVITQu4vr4xnSDxMaL",
+    modelId: "eleven_turbo_v2_5",
+    voiceSettings: { stability: 0.3, similarity_boost: 0.6, style: 0.9, use_speaker_boost: true },
+  },
+
+  // LORE TAPES (TTS - male office worker voice memos)
+  tape_01: {
+    id: "tape_01",
+    category: "lore_tape",
+    prompt: "Day fourteen. The night crew reported voices in the server room again. Maintenance found nothing on the cameras. We're going to need to bring in someone.",
+    loop: false,
+    volume: 0.8,
+    voiceId: "pNInz6obpgDQGcFmaJgB",
+    modelId: "eleven_turbo_v2_5",
+    voiceSettings: { stability: 0.5, similarity_boost: 0.7, style: 0.4, use_speaker_boost: true },
+  },
+  tape_02: {
+    id: "tape_02",
+    category: "lore_tape",
+    prompt: "I asked Janet about the smell in the archives. She said it's been there since they took the building over. She wouldn't tell me when. She wouldn't say from who.",
+    loop: false,
+    volume: 0.8,
+    voiceId: "pNInz6obpgDQGcFmaJgB",
+    modelId: "eleven_turbo_v2_5",
+    voiceSettings: { stability: 0.5, similarity_boost: 0.7, style: 0.4, use_speaker_boost: true },
+  },
+  tape_03: {
+    id: "tape_03",
+    category: "lore_tape",
+    prompt: "It only listens. That's what the old security log said. The lights bother it less than we thought. The sound bothers it more than we knew.",
+    loop: false,
+    volume: 0.8,
+    voiceId: "pNInz6obpgDQGcFmaJgB",
+    modelId: "eleven_turbo_v2_5",
+    voiceSettings: { stability: 0.5, similarity_boost: 0.7, style: 0.4, use_speaker_boost: true },
+  },
+  tape_04: {
+    id: "tape_04",
+    category: "lore_tape",
+    prompt: "I saw something in the vent. Just for a second. It was watching the cubicles. I couldn't move until it pulled itself back up.",
+    loop: false,
+    volume: 0.8,
+    voiceId: "pNInz6obpgDQGcFmaJgB",
+    modelId: "eleven_turbo_v2_5",
+    voiceSettings: { stability: 0.5, similarity_boost: 0.7, style: 0.4, use_speaker_boost: true },
+  },
+  tape_05: {
+    id: "tape_05",
+    category: "lore_tape",
+    prompt: "The third one is the worst. You feel it before you see it. And once you see it, you can't unsee it. Don't look at them. Just keep moving.",
+    loop: false,
+    volume: 0.8,
+    voiceId: "pNInz6obpgDQGcFmaJgB",
+    modelId: "eleven_turbo_v2_5",
+    voiceSettings: { stability: 0.5, similarity_boost: 0.7, style: 0.4, use_speaker_boost: true },
+  },
+  tape_06: {
+    id: "tape_06",
+    category: "lore_tape",
+    prompt: "If anyone finds this. The breaker is the only way out. Don't go up the stairs. Don't ever go up the stairs. There's nothing up there that wants you to leave.",
+    loop: false,
+    volume: 0.8,
+    voiceId: "pNInz6obpgDQGcFmaJgB",
+    modelId: "eleven_turbo_v2_5",
+    voiceSettings: { stability: 0.5, similarity_boost: 0.7, style: 0.4, use_speaker_boost: true },
+  },
+  // MAP FRAGMENT NARRATION (TTS - same voice as lore tapes, triggered on map_fragment pickup)
+  tape_map_fragment: {
+    id: "tape_map_fragment",
+    category: "lore_tape",
+    prompt: "Old facility map. Five sectors. Reception is the hub, Server in the middle, Stairwell at the top. If you got this far, you can get out.",
+    loop: false,
+    volume: 0.85,
+    voiceId: "pNInz6obpgDQGcFmaJgB",
+    modelId: "eleven_turbo_v2_5",
+    voiceSettings: { stability: 0.5, similarity_boost: 0.7, style: 0.4, use_speaker_boost: true },
+  },
+
+  // TUTORIAL VOICE MEMOS (TTS - field operator, same voice as lore tapes)
+  tutorial_t0: {
+    id: "tutorial_t0",
+    category: "lore_tape",
+    prompt: "If you can hear this, get out. It hunts by sound. Stay quiet. Stay hidden.",
+    loop: false,
+    volume: 0.85,
+    voiceId: "pNInz6obpgDQGcFmaJgB",
+    modelId: "eleven_turbo_v2_5",
+    voiceSettings: { stability: 0.5, similarity_boost: 0.7, style: 0.4, use_speaker_boost: true },
+  },
+  tutorial_t1: {
+    id: "tutorial_t1",
+    category: "lore_tape",
+    prompt: "This is field operator. Your flashlight is voice-activated. Speak into your microphone to keep it lit.",
+    loop: false,
+    volume: 0.85,
+    voiceId: "pNInz6obpgDQGcFmaJgB",
+    modelId: "eleven_turbo_v2_5",
+    voiceSettings: { stability: 0.5, similarity_boost: 0.7, style: 0.4, use_speaker_boost: true },
+  },
+  tutorial_t2: {
+    id: "tutorial_t2",
+    category: "lore_tape",
+    prompt: "The thing in the dark hears you. Whisper safely. Talk if you need to see. Never shout unless you have to.",
+    loop: false,
+    volume: 0.85,
+    voiceId: "pNInz6obpgDQGcFmaJgB",
+    modelId: "eleven_turbo_v2_5",
+    voiceSettings: { stability: 0.5, similarity_boost: 0.7, style: 0.4, use_speaker_boost: true },
+  },
+  tutorial_t3: {
+    id: "tutorial_t3",
+    category: "lore_tape",
+    prompt: "Find the keycard, flip the breaker, reach the stairwell. Find materials in other rooms and craft tools at the workbench.",
+    loop: false,
+    volume: 0.85,
+    voiceId: "pNInz6obpgDQGcFmaJgB",
+    modelId: "eleven_turbo_v2_5",
+    voiceSettings: { stability: 0.5, similarity_boost: 0.7, style: 0.4, use_speaker_boost: true },
+  },
+};
+
+export const TUTORIAL_TRANSCRIPTS: Record<TutorialId, string> = {
+  tutorial_t0: "If you can hear this, get out. It hunts by sound. Stay quiet. Stay hidden.",
+  tutorial_t1: "This is field operator. Your flashlight is voice-activated. Speak into your microphone to keep it lit.",
+  tutorial_t2: "The thing in the dark hears you. Whisper safely. Talk if you need to see. Never shout unless you have to.",
+  tutorial_t3: "Find the keycard, flip the breaker, reach the stairwell. Find materials in other rooms and craft tools at the workbench.",
+};
+
+export const MAP_FRAGMENT_TRANSCRIPT =
+  "Old facility map. Five sectors. Reception is the hub, Server in the middle, Stairwell at the top. If you got this far, you can get out.";
+
+export const LORE_TAPE_TRANSCRIPTS: Record<LoreTapeId, string> = {
+  tape_01: "Day fourteen. The night crew reported voices in the server room again. Maintenance found nothing on the cameras. We're going to need to bring in someone.",
+  tape_02: "I asked Janet about the smell in the archives. She said it's been there since they took the building over. She wouldn't tell me when. She wouldn't say from who.",
+  tape_03: "It only listens. That's what the old security log said. The lights bother it less than we thought. The sound bothers it more than we knew.",
+  tape_04: "I saw something in the vent. Just for a second. It was watching the cubicles. I couldn't move until it pulled itself back up.",
+  tape_05: "The third one is the worst. You feel it before you see it. And once you see it, you can't unsee it. Don't look at them. Just keep moving.",
+  tape_06: "If anyone finds this. The breaker is the only way out. Don't go up the stairs. Don't ever go up the stairs. There's nothing up there that wants you to leave.",
 };

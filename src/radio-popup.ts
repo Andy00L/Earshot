@@ -18,7 +18,14 @@ export class RadioPopup {
   private cancelBtn: HTMLButtonElement;
   private presetBtns: HTMLButtonElement[];
   private resolveFn: ((result: ArmRadioResult | null) => void) | null = null;
+
+  // Store all listener refs for cleanup
   private keyHandler: (e: KeyboardEvent) => void;
+  private inputHandler: () => void;
+  private sliderHandler: () => void;
+  private armHandler: () => void;
+  private cancelHandler: () => void;
+  private presetHandlers: { btn: HTMLButtonElement; handler: () => void }[] = [];
 
   constructor() {
     this.root = document.getElementById("radio-popup")!;
@@ -32,26 +39,33 @@ export class RadioPopup {
       document.querySelectorAll(".radio-preset-btn"),
     ) as HTMLButtonElement[];
 
-    this.input.addEventListener("input", () => {
+    this.inputHandler = () => {
       this.charCount.textContent = String(this.input.value.length);
       this.armBtn.disabled = this.input.value.trim().length === 0;
-    });
+    };
+    this.input.addEventListener("input", this.inputHandler);
 
-    this.timerSlider.addEventListener("input", () => {
+    this.sliderHandler = () => {
       this.timerValue.textContent = this.timerSlider.value;
-    });
+    };
+    this.timerSlider.addEventListener("input", this.sliderHandler);
 
     this.presetBtns.forEach((btn) => {
-      btn.addEventListener("click", () => {
+      const handler = () => {
         this.input.value = btn.dataset.preset || "";
         this.charCount.textContent = String(this.input.value.length);
         this.armBtn.disabled = false;
         this.input.focus();
-      });
+      };
+      btn.addEventListener("click", handler);
+      this.presetHandlers.push({ btn, handler });
     });
 
-    this.armBtn.addEventListener("click", () => this.confirm());
-    this.cancelBtn.addEventListener("click", () => this.cancel());
+    this.armHandler = () => this.confirm();
+    this.armBtn.addEventListener("click", this.armHandler);
+
+    this.cancelHandler = () => this.cancel();
+    this.cancelBtn.addEventListener("click", this.cancelHandler);
 
     this.keyHandler = (e: KeyboardEvent) => {
       if (this.root.classList.contains("radio-popup-hidden")) return;
@@ -111,5 +125,13 @@ export class RadioPopup {
 
   destroy(): void {
     document.removeEventListener("keydown", this.keyHandler);
+    this.input.removeEventListener("input", this.inputHandler);
+    this.timerSlider.removeEventListener("input", this.sliderHandler);
+    this.armBtn.removeEventListener("click", this.armHandler);
+    this.cancelBtn.removeEventListener("click", this.cancelHandler);
+    for (const { btn, handler } of this.presetHandlers) {
+      btn.removeEventListener("click", handler);
+    }
+    this.presetHandlers = [];
   }
 }

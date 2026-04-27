@@ -124,6 +124,9 @@ sequenceDiagram
 | radio_keycard_hint | radio_voice | TTS (eleven_v3) | no | 0.8 |
 | radio_breaker_hint | radio_voice | TTS (eleven_v3) | no | 0.8 |
 | radio_exit_hint | radio_voice | TTS (eleven_v3) | no | 0.8 |
+| tape_01..tape_06 | lore_tape | TTS (eleven_turbo_v2_5, Adam) | no | 0.8 |
+| tape_map_fragment | lore_tape | TTS (eleven_turbo_v2_5, Adam) | no | 0.85 |
+| tutorial_t0..t3 | lore_tape | TTS (eleven_turbo_v2_5, Adam) | no | 0.85 |
 
 ## Suspicion curve
 

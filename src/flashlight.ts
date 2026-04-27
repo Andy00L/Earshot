@@ -2,21 +2,34 @@ import { Container, Sprite, Texture } from "pixi.js";
 
 /**
  * Full-screen darkness overlay with a radial gradient "hole" centered
- * on the player. Creates a canvas-based texture once, then repositions
- * the sprite each frame.
+ * on the player. Repaints the gradient when radius or brightness changes,
+ * keeping the dark overlay at full viewport coverage regardless of cone size.
  */
 export class Flashlight {
   public container: Container;
   private sprite: Sprite;
+  private canvas: HTMLCanvasElement;
+  private ctx: CanvasRenderingContext2D;
   private defaultTexture: Texture;
   private lockerTexture: Texture | null = null;
   private hidingMode: "none" | "locker" | "desk" = "none";
+  private static readonly BASE_RADIUS = 280;
+  private static readonly FALLOFF = 80;
+  private static readonly CANVAS_SIZE = 3000;
+  private lastDrawnRadius = -1;
+  private lastDrawnBrightness = -1;
 
   constructor(parent: Container, _viewportWidth: number, _viewportHeight: number) {
     this.container = new Container();
     this.container.zIndex = 100; // above world, below HUD (5000)
 
-    this.defaultTexture = this.createGradientTexture(280, 80);
+    this.canvas = document.createElement("canvas");
+    this.canvas.width = Flashlight.CANVAS_SIZE;
+    this.canvas.height = Flashlight.CANVAS_SIZE;
+    this.ctx = this.canvas.getContext("2d")!;
+
+    this.paintGradient(Flashlight.BASE_RADIUS, 1.0);
+    this.defaultTexture = Texture.from(this.canvas);
     this.sprite = new Sprite(this.defaultTexture);
     this.sprite.anchor.set(0.5, 0.5);
 
@@ -24,31 +37,41 @@ export class Flashlight {
     parent.addChild(this.container);
   }
 
-  private createGradientTexture(radius: number, falloff: number): Texture {
-    const size = 3000;
-    const canvas = document.createElement("canvas");
-    canvas.width = size;
-    canvas.height = size;
-    const ctx = canvas.getContext("2d")!;
+  /** Repaint the gradient canvas with the given cone radius and brightness. */
+  private paintGradient(radius: number, brightness: number): void {
+    const size = Flashlight.CANVAS_SIZE;
+    const ctx = this.ctx;
 
-    // Fill with near-opaque black
+    ctx.clearRect(0, 0, size, size);
+    ctx.globalCompositeOperation = "source-over";
     ctx.fillStyle = "rgba(0, 0, 0, 0.93)";
     ctx.fillRect(0, 0, size, size);
 
-    // Cut out radial gradient hole at center
-    ctx.globalCompositeOperation = "destination-out";
-    const center = size / 2;
-    const outerR = radius + falloff;
-    const gradient = ctx.createRadialGradient(center, center, 0, center, center, outerR);
-    gradient.addColorStop(0, "rgba(0, 0, 0, 1)");
-    gradient.addColorStop(radius / outerR, "rgba(0, 0, 0, 0.85)");
-    gradient.addColorStop(1, "rgba(0, 0, 0, 0)");
-    ctx.fillStyle = gradient;
-    ctx.beginPath();
-    ctx.arc(center, center, outerR, 0, Math.PI * 2);
-    ctx.fill();
+    if (brightness > 0 && radius > 0) {
+      ctx.globalCompositeOperation = "destination-out";
+      const center = size / 2;
+      const outerR = radius + Flashlight.FALLOFF;
+      const gradient = ctx.createRadialGradient(center, center, 0, center, center, outerR);
+      gradient.addColorStop(0, `rgba(0, 0, 0, ${brightness})`);
+      gradient.addColorStop(radius / outerR, `rgba(0, 0, 0, ${brightness * 0.85})`);
+      gradient.addColorStop(1, "rgba(0, 0, 0, 0)");
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(center, center, outerR, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
 
-    return Texture.from(canvas);
+  /** Update cone visuals from Beacon state. Only applies outside hiding spots. */
+  setBeaconVisuals(radius: number, brightness: number): void {
+    if (this.hidingMode !== "none") return;
+    const qr = Math.round(radius / 5) * 5;
+    const qb = Math.round(brightness * 20) / 20;
+    if (qr === this.lastDrawnRadius && qb === this.lastDrawnBrightness) return;
+    this.lastDrawnRadius = qr;
+    this.lastDrawnBrightness = qb;
+    this.paintGradient(qr, qb);
+    this.defaultTexture.source.update();
   }
 
   /** Switch flashlight visual for hiding states. */
@@ -61,11 +84,15 @@ export class Flashlight {
       this.sprite.texture = this.lockerTexture;
       this.sprite.scale.set(1);
     } else if (mode === "desk") {
+      this.paintGradient(Flashlight.BASE_RADIUS * 0.7, 1.0);
+      this.defaultTexture.source.update();
       this.sprite.texture = this.defaultTexture;
-      this.sprite.scale.set(0.7);
+      this.sprite.scale.set(1);
+      this.lastDrawnRadius = -1;
     } else {
       this.sprite.texture = this.defaultTexture;
       this.sprite.scale.set(1);
+      this.lastDrawnRadius = -1;
     }
   }
 
