@@ -13,6 +13,7 @@ export class AudioManager {
   private masterVolume: number = 1.0;
   private suspended: boolean = false;
   private activeBlobs: Map<string, Howl> = new Map();
+  private fadeStopTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
   async loadAll(onProgress?: (loaded: number, total: number) => void): Promise<void> {
     // Skip if already loaded (survives Game restart)
@@ -58,6 +59,11 @@ export class AudioManager {
   crossfadeAmbient(id: AmbientId, fadeMS: number = 800): void {
     if (this.currentAmbient === id) return;
 
+    if (this.fadeStopTimeoutId !== null) {
+      clearTimeout(this.fadeStopTimeoutId);
+      this.fadeStopTimeoutId = null;
+    }
+
     const prev = this.currentAmbientHowl;
     const next = this.sounds.get(id);
     if (!next) {
@@ -71,7 +77,10 @@ export class AudioManager {
 
     if (prev) {
       prev.fade(prev.volume(), 0, fadeMS);
-      setTimeout(() => prev.stop(), fadeMS + 100);
+      this.fadeStopTimeoutId = setTimeout(() => {
+        prev.stop();
+        this.fadeStopTimeoutId = null;
+      }, fadeMS + 100);
     }
 
     this.currentAmbient = id;
@@ -115,9 +124,16 @@ export class AudioManager {
 
   fadeOutAmbient(fadeMS: number = 600): void {
     if (this.currentAmbientHowl) {
+      if (this.fadeStopTimeoutId !== null) {
+        clearTimeout(this.fadeStopTimeoutId);
+        this.fadeStopTimeoutId = null;
+      }
       const h = this.currentAmbientHowl;
       h.fade(h.volume(), 0, fadeMS);
-      setTimeout(() => h.stop(), fadeMS + 100);
+      this.fadeStopTimeoutId = setTimeout(() => {
+        h.stop();
+        this.fadeStopTimeoutId = null;
+      }, fadeMS + 100);
       this.currentAmbient = null;
       this.currentAmbientHowl = null;
     }

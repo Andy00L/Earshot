@@ -1,15 +1,15 @@
 # Earshot Asset Usage Audit
 
 Date: 2026-04-26
-Total assets on disk: 269
+Total assets on disk: 278
 Total disk size: 75 MB (images ~71 MB, audio ~4.1 MB, other ~74 KB)
 
 ## Summary
 
-- Assets used: 180 (142 images, 37 audio, 1 other)
+- Assets used: 189 (142 images, 46 audio, 1 other)
 - Assets unused on disk: 83 (76 images, 6 audio, 1 other)
 - Assets ambiguous: 6 (whisperer idle frames)
-- Code references missing files: 9 (all audio)
+- Code references missing files: 3 (all audio)
 - Estimated recoverable disk space from unused assets: ~22.5 MB
 
 ## Section 1. Unused Assets (Candidates for Deletion)
@@ -41,6 +41,7 @@ Total disk size: 75 MB (images ~71 MB, audio ~4.1 MB, other ~74 KB)
 | `traversal/` | 6 frames | ~770 KB | USED. Phase 9 wired for Server room ladder (ladder-bottom, ladder-mid, ladder-top, hatch) |
 | `server-upper.png` | 1 file | 2.7 MB | USED. Phase 9 renders as upper floor background in Server room |
 | `gameover.png` | 1 file | 1.2 MB | USED. Phase 9 renders in death overlay via HTML img element |
+| `intro/` | 3 files (intro-panel-1/2/3.png) | ~6.3 MB | USED. Phase B intro panels, loaded directly via Assets.load (not in atlas.json) |
 
 #### Partial entity groups (some frames used, some not)
 
@@ -148,17 +149,11 @@ Total disk size: 75 MB (images ~71 MB, audio ~4.1 MB, other ~74 KB)
 
 ## Section 2. Missing Assets (Referenced in Code, Absent on Disk)
 
-All 9 missing assets are audio. The `audioManager.loadAll()` method logs a warning and continues for each missing file. Call sites either use `audioManager.has()` to guard playback (silent skip) or call `playOneShot()` directly (returns `null`, no sound plays).
+3 missing assets remain, all audio. The `audioManager.loadAll()` method logs a warning and continues for each missing file. Call sites either use `audioManager.has()` to guard playback (silent skip) or call `playOneShot()` directly (returns `null`, no sound plays).
 
 | Code reference | Missing key | has() guard? | Impact |
 |----------------|-------------|-------------|--------|
 | `game.ts:989` (dynamic: `` `${toRoom}_ambient` ``) | `archives_ambient` | No (crossfadeAmbient warns) | Archives room has no ambient music. Console warning on enter |
-| `game.ts:2172` | `confused_growl` | Yes (`has()` check) | Silent skip. Monster confused animation plays without audio |
-| `game.ts:1192` | `monster_growl_close` | Yes (`has()` check) | Silent skip. Death cinematic close growl is silent |
-| `game.ts:1697, 1758` | `locker_open` | No (direct `playOneShot`) | Silent skip (returns null). Locker open has no sound |
-| `game.ts:1717` | `locker_close` | No (direct `playOneShot`) | Silent skip. Locker close has no sound |
-| `game.ts:1747` | `locker_door_creak` | No (direct `playOneShot`) | Silent skip. Jumper locker creak has no sound |
-| `game.ts:1721` | `desk_crouch` | No (direct `playOneShot`) | Silent skip. Desk hide has no sound |
 | `game.ts:2159`, `decoy-effect.ts:39` | `static_burst` | Yes (`has()` check) | Fallback to random monster vocal. Decoy radio uses monster growl instead |
 | `game.ts:2100, 2363` | `radio_throw` | Yes (`has()` check) | Silent skip. Radio throw has no sound |
 
@@ -258,10 +253,10 @@ The `gameover` background was likely used before the death flow was changed to `
 - Total in catalog: 5 | On disk: 4 | Missing: 1 (archives_ambient) | Used: 4
 
 ### Audio - Monster Vocals
-- Total in catalog: 8 (6 standard + 2 confused) | On disk: 6 | Missing: 2 (confused_growl, monster_growl_close) | Used: 6
+- Total in catalog: 8 (6 standard + 2 confused) | On disk: 8 | Missing: 0 | Used: 8
 
 ### Audio - SFX
-- Total in catalog: 16 | On disk: 10 | Missing: 6 (locker_close, locker_open, locker_door_creak, desk_crouch, static_burst, radio_throw) | Used: 8 | On disk but never played: 2 (flashlight_click, player_breath_normal)
+- Total in catalog: 16 | On disk: 14 | Missing: 2 (static_burst, radio_throw) | Used: 12 | On disk but never played: 2 (flashlight_click, player_breath_normal)
 
 ### Audio - Radio Voice (pre-recorded hints)
 - Total in catalog: 4 | On disk: 4 | Used: 0 (radio system switched to runtime TTS)
@@ -274,6 +269,9 @@ The `gameover` background was likely used before the death flow was changed to `
 
 ### Audio - Tutorials
 - Total in catalog: 4 | On disk: 4 | Used: 4
+
+### Audio - Intro Narration
+- Total in catalog: 3 | On disk: 3 | Used: 3
 
 ## Section 5. Bundle Size
 
@@ -352,18 +350,12 @@ These 6 files alone total ~9.6 MB.
 | Missing ID | Call sites | Has guard? | Impact |
 |------------|-----------|------------|--------|
 | `archives_ambient` | Dynamic ambient crossfade | Warn + skip | Archives room is silent |
-| `confused_growl` | `game.ts:2172` | Yes | Monster confused state is silent |
-| `monster_growl_close` | `game.ts:1192` | Yes | Death cinematic close growl missing |
-| `locker_open` | `game.ts:1697, 1758` | No | Locker interactions are silent |
-| `locker_close` | `game.ts:1717` | No | Same |
-| `locker_door_creak` | `game.ts:1747` | No | Same |
-| `desk_crouch` | `game.ts:1721` | No | Desk hiding is silent |
 | `static_burst` | `game.ts:2159`, `decoy-effect.ts:39` | Yes | Decoy falls back to monster growl |
 | `radio_throw` | `game.ts:2100, 2363` | Yes | Radio throw is silent |
 
 Command to generate all missing audio:
 ```bash
-npx tsx scripts/generate-audio.ts --only archives_ambient,confused_growl,monster_growl_close,locker_close,locker_open,locker_door_creak,desk_crouch,static_burst,radio_throw
+npx tsx scripts/generate-audio.ts --only archives_ambient,static_burst,radio_throw
 ```
 
 ### Code cleanup (out of scope for this audit, noted for reference)
@@ -371,7 +363,7 @@ npx tsx scripts/generate-audio.ts --only archives_ambient,confused_growl,monster
 - Remove unused audio IDs from catalog: `flashlight_click`, `player_breath_normal`, `radio_intro`, `radio_keycard_hint`, `radio_breaker_hint`, `radio_exit_hint`
 - Remove unused entities from atlas.json: `bookshelves`, `cubicle-dividers`, `traversal`
 - Remove unused frames from atlas.json entities that have partial usage
-- Add `has()` guards to `locker_open`, `locker_close`, `locker_door_creak`, `desk_crouch` call sites (or generate the files)
+- Add `has()` guards to `static_burst`, `radio_throw` call sites (or generate the files)
 
 ## Section 7. Audit Methodology
 

@@ -127,6 +127,9 @@ sequenceDiagram
 | tape_01..tape_06 | lore_tape | TTS (eleven_turbo_v2_5, Adam) | no | 0.8 |
 | tape_map_fragment | lore_tape | TTS (eleven_turbo_v2_5, Adam) | no | 0.85 |
 | tutorial_t0..t3 | lore_tape | TTS (eleven_turbo_v2_5, Adam) | no | 0.85 |
+| intro_panel_1 | intro_vo | TTS (eleven_turbo_v2_5, Adam) | no | 0.85 |
+| intro_panel_2 | intro_vo | TTS (eleven_turbo_v2_5, Adam) | no | 0.85 |
+| intro_panel_3 | intro_vo | TTS (eleven_turbo_v2_5, Adam) | no | 0.85 |
 
 ## Suspicion curve
 
@@ -134,13 +137,13 @@ The mapping from mic RMS to suspicion-per-second is piecewise linear, tuned so w
 
 | RMS range | Label | Suspicion/sec | Time to ALERT (30) |
 |---|---|---|---|
-| < 0.01 | silence | 0 | never |
-| 0.01 - 0.04 | whisper | 0 - 5 | 30+ seconds |
-| 0.04 - 0.15 | normal | 5 - 30 | ~1 second |
-| 0.15 - 0.40 | loud | 30 - 80 | < 0.5 seconds |
-| > 0.40 | shout | 80 - 120 | instant |
+| < 0.01125 | silence | 0 | never |
+| 0.01125 - 0.0225 | whisper | 0 - 6.4 | 30+ seconds |
+| 0.0225 - 0.0675 | normal | 6.4 - 32 | ~1.5 seconds |
+| 0.0675 - 0.18 | loud | 32 - 72 | < 1 second |
+| > 0.18 | shout | 72 - 96 | < 0.5 seconds |
 
-Thresholds live in `src/suspicion.ts`. Smoothing alpha (0.2) lives in `src/mic.ts`.
+Thresholds live in `src/suspicion.ts` (calibration v2, modere preset: +50% RMS thresholds, -20% curve output). Smoothing alpha (0.2) lives in `src/mic.ts`.
 
 ### Tuning guide
 

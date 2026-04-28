@@ -4,7 +4,7 @@
 
 ## System Overview
 
-Earshot is a browser-based 2D horror game with 23 TypeScript source files, 5 Python pipeline scripts, and 1 HTML entry point. The game runs on Pixi.js for rendering and Howler.js for audio. The player's real microphone feeds into a suspicion system that drives a 6-state monster AI.
+Earshot is a browser-based 2D horror game with 34 TypeScript source files, 4 Python pipeline scripts, 1 TypeScript pipeline script, and 1 HTML entry point. The game runs on Pixi.js for rendering and Howler.js for audio. The player's real microphone feeds into a suspicion system that drives a 6-state monster AI.
 
 ```mermaid
 graph TD
@@ -16,15 +16,18 @@ graph TD
         subgraph "Game Logic"
             GAME --> PLAYER[player.ts<br>8 animation states]
             GAME --> MONSTER[monster.ts<br>6-state AI FSM]
-            GAME --> ROOMS_MGR[rooms.ts<br>4 room definitions]
+            GAME --> JUMPER[jumper.ts<br>Ceiling ambush]
+            GAME --> WHISPERER[whisperer.ts<br>Beacon drain ghost]
+            GAME --> ROOMS_MGR[rooms.ts<br>5 room definitions]
             GAME --> INPUT[input.ts<br>Keyboard + edge detect]
             GAME --> PICKUP[pickup.ts<br>Keycard, breaker]
             GAME --> HIDING[hiding.ts<br>Locker, desk]
+            GAME --> CRAFTING[crafting.ts<br>Recipes + inventory]
         end
 
         subgraph "Audio Pipeline"
             GAME --> AUDIO[audio.ts<br>Howler wrapper]
-            AUDIO --> CATALOG[audio-catalog.ts<br>32 asset defs]
+            AUDIO --> CATALOG[audio-catalog.ts<br>56 asset defs]
             GAME --> MIC[mic.ts<br>RMS analyser]
             MIC --> SUSPICION[suspicion.ts<br>RMS to delta/sec]
             GAME --> HEARTBEAT[heartbeat.ts<br>Procedural lub-dub]
@@ -32,7 +35,8 @@ graph TD
         end
 
         subgraph "Rendering"
-            GAME --> HUD[hud.ts<br>Suspicion bar, prompts]
+            GAME --> HUD[hud.ts<br>Beacon meter, prompts]
+            HUD --> MINIMAP[minimap.ts<br>5-room parchment map]
             GAME --> FLASH[flashlight.ts<br>Radial darkness]
             GAME --> VIGNETTE[vignette.ts<br>Edge darkening]
             GAME --> SHAKE[screen-shake.ts<br>Camera jitter]
@@ -51,7 +55,7 @@ graph TD
 
     subgraph "Build Pipeline"
         VITE[Vite v6<br>Dev server + bundler] --> INDEX
-        VITE -->|define| ENV[.env<br>ELEVENLABS_API_KEY]
+        VITE --> ENV[.env<br>ELEVENLABS_API_KEY]
     end
 
     subgraph "Asset Pipeline"
@@ -60,7 +64,9 @@ graph TD
         SLICE --> DETECT[detect.py]
         SLICE --> CONFIG[atlas_config.py]
         SLICE --> ASSETS_DIR[assets/<br>PNGs + atlas.json]
-        GEN[generate-audio.ts] -->|ElevenLabs API| AUDIO_DIR[assets/audio/<br>24 MP3s]
+        TTS -->|HTTPS POST| PROXY[api/tts.ts<br>Vercel serverless]
+    PROXY -->|inject API key| ELEVEN
+    GEN[generate-audio.ts] -->|ElevenLabs API| AUDIO_DIR[assets/audio/<br>56 MP3s]
     end
 ```
 
@@ -70,9 +76,12 @@ graph TD
 Eleven labs/
   index.html               Game HTML shell (1280x720 viewport, overlays, radio popup form)
   package.json             v0.2.0, scripts: dev/build/slice/audio:generate
-  vite.config.ts           Public dir: assets/, defines __ELEVENLABS_API_KEY__
+  vite.config.ts           Public dir: assets/, strip-debug-assets plugin
   tsconfig.json            ES2020, strict disabled, bundler module resolution
+  vercel.json              Vercel deployment config, cache headers
   .env                     ELEVENLABS_API_KEY (not committed)
+  api/
+    tts.ts                 Vercel serverless TTS proxy (POST-only, injects API key, 8s timeout)
   src/
     main.ts                Bootstrap, title screen, ambient drone
     game.ts                Game loop, state machine, all subsystem coordination
@@ -81,17 +90,26 @@ Eleven labs/
     input.ts               Key state tracking, edge detection
     player.ts              Sprite, 8 states, movement physics
     monster.ts             AI FSM, suspicion tracking, lure mechanics
+    jumper.ts              Ceiling ambush predator (5-state: dormant, triggered, falling, attacking, retreating)
+    whisperer.ts           Psychological drain ghost (4-state: spawning, idle, fading, despawned)
     rooms.ts               ROOM_DEFINITIONS constant, RoomManager class
     room.ts                Background sprite container
     pickup.ts              Collectable item behavior
     hiding.ts              HidingSpot proximity and state
+    crafting.ts            Crafting recipes and inventory management
+    workbench-menu.ts      HTML overlay for crafting UI
+    projectile.ts          Throwable item physics
+    shade.ts               Death shade (inventory ghost)
+    flare-effect.ts        Flare projectile with light radius
+    smokebomb-effect.ts    Smoke bomb area effect
+    decoy-effect.ts        Decoy radio broadcast effect
     audio.ts               AudioManager singleton (Howler wrapper)
-    audio-catalog.ts       AUDIO_CATALOG constant (32 entries)
+    audio-catalog.ts       AUDIO_CATALOG constant (56 entries)
     mic.ts                 MicAnalyser singleton (Web Audio)
     suspicion.ts           rmsToSuspicionPerSec(), suspicionDeltaForFrame()
     tts.ts                 synthesizeTTS() (ElevenLabs POST)
-    hud.ts                 HUD class (Pixi text overlays, hosts Minimap)
-    minimap.ts             Minimap class (parchment sprites, visited tracking, player dot pulse)
+    hud.ts                 HUD class (beacon meter, prompts, subtitles, inventory slots, hosts Minimap)
+    minimap.ts             Minimap class (parchment sprites, 5-room layout, visited tracking, player dot pulse)
     flashlight.ts          Flashlight class (canvas radial gradient)
     vignette.ts            Vignette class (Pixi graphics)
     screen-shake.ts        ScreenShake class (random offset + decay)
@@ -100,14 +118,14 @@ Eleven labs/
     transition.ts          fadeTransition() async function
   scripts/
     slice.py               Pipeline orchestrator (~550 lines)
-    atlas_config.py        ATLAS_PROFILES dict (18 entries)
+    atlas_config.py        ATLAS_PROFILES dict (53 entries)
     chroma.py              HSV chroma key, despill, feathering
     detect.py              CCL 8-connectivity, morphological closing
     generate-audio.ts      ElevenLabs audio asset generator CLI
     requirements.txt       Pillow, numpy, scipy
   assets/
     atlas.json             Generated sprite manifest
-    audio/                 24 MP3 files
+    audio/                 56 MP3 files
     player/                31 PNGs
     monster/               27 PNGs
     props/                 12 PNGs
@@ -126,14 +144,20 @@ Eleven labs/
 
 ### game.ts (Central Orchestrator)
 
-The `Game` class owns every subsystem and runs the main loop via Pixi's ticker. It has 3 phases: TITLE, PLAYING, DYING.
+The `Game` class owns every subsystem and runs the main loop via Pixi's ticker. Phases: INTRO, PLAYING, PAUSED, DYING, GAMEOVER, WIN.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> TITLE : Game.start()
-    TITLE --> PLAYING : Click to start + mic init
+    [*] --> LOADING : Page load
+    LOADING --> TITLE : Assets loaded
+    TITLE --> INTRO : Click (first visit)
+    TITLE --> PLAYING : Click (after restart)
+    INTRO --> PLAYING : 3 panels clicked (or Esc held 1s)
+    PLAYING --> PAUSED : Radio popup / workbench
+    PAUSED --> PLAYING : Close popup
     PLAYING --> DYING : Monster catches player
-    DYING --> TITLE : Restart
+    DYING --> GAMEOVER : Death cinematic
+    GAMEOVER --> PLAYING : Press R (restart, no intro)
     PLAYING --> WIN : Reach stairwell exit
 ```
 
@@ -201,13 +225,13 @@ Movement is clamped to `[50, roomWidth - 50]`. The player's Y position is anchor
 
 ### rooms.ts (Room Definitions)
 
-`ROOM_DEFINITIONS` is a constant that defines all 4 rooms with their full contents:
+`ROOM_DEFINITIONS` is a constant that defines all 5 rooms with their full contents:
 
 ```mermaid
 graph LR
     subgraph Reception
-        R_DOOR[Door to Cubicles<br>press_e]
-        R_PROPS[exit-sign, flickerlight]
+        R_DOOR[Doors to Cubicles,<br>Server, Archives]
+        R_PROPS[exit-sign, flickerlight,<br>workbench]
     end
 
     subgraph Cubicles
@@ -217,6 +241,7 @@ graph LR
         C_HIDE[2 desks, 1 locker]
         C_RADIO[Radio on table]
         C_FG[7 foreground dividers<br>maze occlusion]
+        C_VENT[Vent to Stairwell]
     end
 
     subgraph Server
@@ -232,12 +257,24 @@ graph LR
         ST_DOOR_L[Door to Server<br>press_e]
         ST_EXIT[Exit door<br>requires keycard]
         ST_HIDE[1 desk]
-        ST_ALL[All 3 monsters<br>Listener+Jumper+Whisperer]
+        ST_VENT[Vent to Cubicles]
+        ST_ALL[Listener+Jumper+<br>Whisperer 40%]
+    end
+
+    subgraph Archives
+        A_DOOR[Door to Reception<br>press_e]
+        A_ITEMS[Battery, map fragment,<br>lore tapes 04+05]
+        A_HIDE[1 desk]
+        A_WHISPERER[Whisperer 30%]
+        A_DRAIN[Beacon drains 1.5x]
     end
 
     Reception --> Cubicles
+    Reception --> Server
+    Reception --> Archives
     Cubicles --> Server
     Server --> Stairwell
+    Cubicles -.->|vent| Stairwell
 ```
 
 Each `RoomDefinition` contains:
@@ -265,6 +302,17 @@ Each `RoomDefinition` contains:
 | 50 | Player |
 | 55 | Hatch sprite (above player at ladder top) |
 | 80 | Foreground props (cubicle dividers) |
+
+#### Stage-level layers (app.stage, sortableChildren=true)
+
+| zIndex | Content |
+|--------|---------|
+| 100 | Flashlight canvas overlay |
+| 150 | Vignette overlay |
+| 5000 | HUD (suspicion meter, prompts) |
+| 7000 | Intro panel container (3 panels, one visible at a time, each with a TTS voiceover narration via Adam voice) |
+| 9500 | Loading screen (HTML, removed after boot) |
+| 10000 | Fade transition overlay (temporary, during room changes) |
 
 ### audio.ts (AudioManager)
 
@@ -312,20 +360,24 @@ The `MicAnalyser` connects to Howler's shared AudioContext (`Howler.ctx`) so the
 
 The suspicion curve in `suspicion.ts` was calibrated against observed RMS values:
 - Observed silence/idle: 0.0008 to 0.0021
-- Silence floor set at 0.0025 (above max observed idle)
-- Saturation at 120/sec (even shouting cannot exceed this)
+- Silence floor set at 0.01125 (calibration v2, +50% from 0.0075, above laptop mic idle noise)
+- Saturation at 96/sec (calibration v2, 0.8x from 120, more forgiving overall)
 
 ### tts.ts (ElevenLabs Integration)
 
-`synthesizeTTS(text, signal?)` makes a POST request to the ElevenLabs API:
+`synthesizeTTS(text, signal?, options?)` makes a POST request to the Vercel serverless proxy:
 
-- Endpoint: `https://api.elevenlabs.io/v1/text-to-speech/{VOICE_ID}`
-- Voice: Adam (pNInz6obpgDQGcFmaJgB)
-- Model: eleven_turbo_v2_5 (low latency)
+- Client endpoint: `POST /api/tts`
+- Server proxy: `api/tts.ts` (Vercel serverless function)
+- The proxy injects `ELEVENLABS_API_KEY` from `process.env` and forwards to `https://api.elevenlabs.io/v1/text-to-speech/{voice_id}`
+- Default voice: Adam (`pNInz6obpgDQGcFmaJgB`)
+- Allowed voices: Adam + Bella (`EXAVITQu4vr4xnSDxMaL`)
+- Model: `eleven_turbo_v2_5` (low latency)
 - Voice settings: stability 0.4, similarity_boost 0.7, style 0.6
+- 8-second upstream timeout, 200 character text limit
 - Returns: Blob URL for Howler playback
 
-The API key (`__ELEVENLABS_API_KEY__`) is injected by Vite's `define` at build time from `.env`. This means the key is in the client bundle. The code includes a security warning about this.
+The API key never reaches the client bundle. It stays server-side in the Vercel environment.
 
 ### minimap.ts (Parchment Minimap)
 
@@ -454,8 +506,9 @@ All game state lives in a single `GameState` object created by `createInitialGam
 
 ```typescript
 interface GameState {
-  phase: GamePhase;           // "TITLE" | "PLAYING" | "DYING"
-  currentRoom: RoomId;        // "reception" | "cubicles" | "server" | "stairwell"
+  phase: GamePhase;           // "INTRO" | "PLAYING" | "PAUSED" | "DYING" | "GAMEOVER" | "WIN"
+  introPanelIndex: 0 | 1 | 2;
+  currentRoom: RoomId;        // "reception" | "cubicles" | "server" | "stairwell" | "archives"
   inventory: Set<PickupId>;   // "keycard" | "breaker_switch"
   breakerOn: boolean;
   suspicion: number;          // 0-100
@@ -487,7 +540,7 @@ There is no global error boundary. Errors in the game loop will stop the ticker.
 
 **DOM overlays for UI.** The radio popup and gameover stats use HTML/CSS rather than Pixi text. This simplifies text input handling and styling at the cost of mixing two rendering approaches.
 
-**Client-side API key.** The ElevenLabs key is compiled into the bundle via Vite define. This is a known security tradeoff for hackathon speed. Production would need a backend proxy.
+**Server-side API key.** The ElevenLabs key is held server-side in a Vercel serverless function (`api/tts.ts`). The client calls `/api/tts`, the proxy injects the key and forwards to ElevenLabs. The key never appears in the client bundle.
 
 **Python asset pipeline.** The sprite slicer uses connected-component labeling (scipy) rather than fixed grid slicing. This handles hand-drawn art where frames have varying widths and occasional detached elements (fingers, weapons).
 

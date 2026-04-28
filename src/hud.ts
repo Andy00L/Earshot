@@ -24,6 +24,7 @@ export class HUD {
   private subtitleBg: Graphics;
   private subtitleText: Text;
   private subtitleHideTimer: ReturnType<typeof setTimeout> | null = null;
+  private fadeRafId: number | null = null;
   private minimap: Minimap;
 
   constructor(parent: Container) {
@@ -432,9 +433,20 @@ export class HUD {
       const elapsed = performance.now() - startTime;
       const t = Math.min(elapsed / 300, 1);
       this.subtitleContainer.alpha = 1 - t;
-      if (t < 1) requestAnimationFrame(fade);
+      if (t < 1) {
+        this.fadeRafId = requestAnimationFrame(fade);
+      } else {
+        this.fadeRafId = null;
+      }
     };
     fade();
+  }
+
+  cancelFade(): void {
+    if (this.fadeRafId !== null) {
+      cancelAnimationFrame(this.fadeRafId);
+      this.fadeRafId = null;
+    }
   }
 
   updateMinimap(currentRoom: RoomId, hasMapFragment: boolean): void {

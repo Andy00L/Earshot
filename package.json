@@ -1,8 +1,8 @@
 {
-  "name": "hush-assets",
+  "name": "earshot",
   "version": "0.2.0",
   "type": "module",
-  "description": "Asset pipeline for Hush — hand-drawn atmospheric horror. Drop PNGs into raw/, run npm run slice.",
+  "description": "Asset pipeline for Earshot -- hand-drawn atmospheric horror. Drop PNGs into raw/, run npm run slice.",
   "scripts": {
     "slice": "python scripts/slice.py",
     "slice:clean": "python scripts/slice.py --clean",

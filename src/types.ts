@@ -64,7 +64,7 @@ export interface Shade {
 }
 
 // Game phases. Drives main loop branching.
-export type GamePhase = "PLAYING" | "PAUSED" | "DYING" | "GAMEOVER" | "WIN";
+export type GamePhase = "INTRO" | "PLAYING" | "PAUSED" | "DYING" | "GAMEOVER" | "WIN";
 
 // Door unlock requirements.
 export type DoorRequirement = "none" | "press_e" | "keycard" | "breaker_on";
@@ -109,6 +109,7 @@ export interface RunStats {
 
 export interface GameState {
   phase: GamePhase;
+  introPanelIndex: 0 | 1 | 2;
   currentRoom: RoomId;
   inventory: Set<PickupId>;
   breakerOn: boolean;
@@ -128,6 +129,7 @@ export interface GameState {
 export function createInitialGameState(): GameState {
   return {
     phase: "PLAYING",
+    introPanelIndex: 0,
     currentRoom: "reception",
     inventory: new Set(),
     breakerOn: false,

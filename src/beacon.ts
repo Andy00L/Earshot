@@ -7,13 +7,13 @@
 export const BEACON_MAX = 100;
 export const BEACON_INITIAL = 100;
 export const BEACON_MAX_FLOOR = 50;
-export const BEACON_DRAIN_HIGH = 2.0;
-export const BEACON_DRAIN_LOW = 6.0;
+export const BEACON_DRAIN_HIGH = 1.2;
+export const BEACON_DRAIN_LOW = 3.5;
 export const BEACON_DRAIN_LOW_THRESHOLD = 30;
 
 export const BEACON_REFILL_WHISPER = 1.0;
 export const BEACON_REFILL_NORMAL = 3.0;
-export const BEACON_REFILL_SHOUT = 12.0;
+export const BEACON_REFILL_SHOUT = 24.0;
 
 export const VISION_RADIUS_MIN = 0;
 export const VISION_RADIUS_MAX = 280;
@@ -27,9 +27,10 @@ export const SUSPICION_MULT_NORMAL = 1.0;
 export const SUSPICION_MULT_SHOUT = 2.0;
 
 // RMS band boundaries (from suspicion.ts calibrated curve, not redefined here)
-export const RMS_THRESHOLD_WHISPER = 0.0075;
-export const RMS_THRESHOLD_NORMAL = 0.015;
-export const RMS_THRESHOLD_SHOUT = 0.045;
+// Calibration v2: +50% on all thresholds (modere preset, 2026-04-27)
+export const RMS_THRESHOLD_WHISPER = 0.01125;
+export const RMS_THRESHOLD_NORMAL = 0.0225;
+export const RMS_THRESHOLD_SHOUT = 0.0675;
 
 export type VoiceBand = "silent" | "whisper" | "normal" | "shout";
 

@@ -50,7 +50,9 @@ export type TutorialId = "tutorial_t0" | "tutorial_t1" | "tutorial_t2" | "tutori
 
 export type MapNarrationId = "tape_map_fragment";
 
-export type AudioId = AmbientId | MonsterVocalId | MonsterConfusedVocalId | SfxId | RadioVoiceId | WhispererVoiceId | LoreTapeId | TutorialId | MapNarrationId;
+export type IntroNarrationId = "intro_panel_1" | "intro_panel_2" | "intro_panel_3";
+
+export type AudioId = AmbientId | MonsterVocalId | MonsterConfusedVocalId | SfxId | RadioVoiceId | WhispererVoiceId | LoreTapeId | TutorialId | MapNarrationId | IntroNarrationId;
 
 export interface WhispererVoiceSettings {
   stability: number;
@@ -547,6 +549,38 @@ export const AUDIO_CATALOG: Record<AudioId, AudioAsset> = {
     id: "tutorial_t3",
     category: "lore_tape",
     prompt: "Find the keycard, flip the breaker, reach the stairwell. Find materials in other rooms and craft tools at the workbench.",
+    loop: false,
+    volume: 0.85,
+    voiceId: "pNInz6obpgDQGcFmaJgB",
+    modelId: "eleven_turbo_v2_5",
+    voiceSettings: { stability: 0.5, similarity_boost: 0.7, style: 0.4, use_speaker_boost: true },
+  },
+
+  // INTRO PANEL NARRATION (TTS - same voice as lore tapes, played during intro sequence)
+  intro_panel_1: {
+    id: "intro_panel_1",
+    category: "lore_tape",
+    prompt: "You shouldn't be here. But you are.",
+    loop: false,
+    volume: 0.85,
+    voiceId: "pNInz6obpgDQGcFmaJgB",
+    modelId: "eleven_turbo_v2_5",
+    voiceSettings: { stability: 0.5, similarity_boost: 0.7, style: 0.4, use_speaker_boost: true },
+  },
+  intro_panel_2: {
+    id: "intro_panel_2",
+    category: "lore_tape",
+    prompt: "It hunts by sound. Your microphone is the controller. Whisper. Or don't speak at all.",
+    loop: false,
+    volume: 0.85,
+    voiceId: "pNInz6obpgDQGcFmaJgB",
+    modelId: "eleven_turbo_v2_5",
+    voiceSettings: { stability: 0.5, similarity_boost: 0.7, style: 0.4, use_speaker_boost: true },
+  },
+  intro_panel_3: {
+    id: "intro_panel_3",
+    category: "lore_tape",
+    prompt: "Get out. Three things stand between you and the door. One. Keycard. Find it first. Two. Breaker. Power needed. Three. Stairwell exit. Your way out.",
     loop: false,
     volume: 0.85,
     voiceId: "pNInz6obpgDQGcFmaJgB",

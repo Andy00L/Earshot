@@ -35,7 +35,9 @@ function stripAssetsPrefix(filePath: string): string {
   return filePath.startsWith('assets/') ? filePath.slice(7) : filePath;
 }
 
-export async function loadGameAssets(): Promise<Manifest> {
+export async function loadGameAssets(
+  onProgress?: (progress: number) => void,
+): Promise<Manifest> {
   const response = await fetch('/atlas.json');
   if (!response.ok) {
     const msg = `Failed to load atlas.json: ${response.status} ${response.statusText}`;
@@ -68,7 +70,15 @@ export async function loadGameAssets(): Promise<Manifest> {
     }
   }
 
-  await Assets.load(aliases);
+  // Intro panels (not in atlas.json, loaded directly)
+  const introPanels = ['panel-1', 'panel-2', 'panel-3'];
+  for (const panel of introPanels) {
+    const alias = `intro:${panel}`;
+    Assets.add({ alias, src: `/intro/intro-${panel}.png` });
+    aliases.push(alias);
+  }
+
+  await Assets.load(aliases, onProgress);
   return manifest;
 }
 

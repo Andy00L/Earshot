@@ -64,6 +64,10 @@ export class Input {
     return this.held.has('Control');
   }
 
+  isEscapeHeld(): boolean {
+    return this.held.has('Escape');
+  }
+
   /** Returns true on the single frame a key code was first pressed. */
   justPressed(code: string): boolean {
     return this.codesPressedThisFrame.has(code);

@@ -65,8 +65,26 @@ import { DecoyEffect } from "./decoy-effect";
 import { WorkbenchMenu } from "./workbench-menu";
 import { ShadeVisual } from "./shade";
 
+/** Revoke any outstanding TTS blob URLs to prevent memory leaks. */
+function revokeRadioBlobs(radios: { ttsBlobUrl?: string | null }[]): void {
+  for (const r of radios) {
+    if (r.ttsBlobUrl) {
+      URL.revokeObjectURL(r.ttsBlobUrl);
+      r.ttsBlobUrl = null;
+    }
+  }
+}
+
 // Survives Game restart (audio stays loaded, mic stays active)
 let audioInitialized = false;
+
+/** Mark audio as pre-loaded (called from main.ts when boot loads audio early). */
+export function markAudioInitialized(): void {
+  audioInitialized = true;
+}
+
+// Survives Game restart (intro plays once per page load, not per restart)
+let introPlayed = false;
 
 // localStorage key: set after all 4 tutorials complete; skips on future runs
 const TUTORIAL_SEEN_KEY = "earshot.tutorialSeen";
@@ -110,6 +128,7 @@ export class Game {
   private droppedRadioSprites: Map<string, Sprite> = new Map();
   private spentRadioSprites: Map<string, Sprite> = new Map();
   private armedRadioAborts: Map<string, AbortController> = new Map();
+  private activeRafIds: Set<number> = new Set();
 
   // Foreground layer (dividers that render above the player for occlusion)
   private foregroundLayer!: Container;
@@ -174,6 +193,12 @@ export class Game {
   // Visibility change cleanup
   private visibilityHandler: (() => void) | null = null;
 
+  // Intro panel sequence
+  private introContainer: Container | null = null;
+  private introTransitioning = false;
+  private introClickHandler: ((e: PointerEvent) => void) | null = null;
+  private introEscHeldMs = 0;
+
   constructor(app: Application, manifest: Manifest) {
     this.app = app;
     this.manifest = manifest;
@@ -230,6 +255,9 @@ export class Game {
     if (!audioInitialized) {
       await this.initAudio();
       audioInitialized = true;
+    } else if (micAnalyser.state !== "active" && micAnalyser.state !== "idle" && micAnalyser.state !== "requesting") {
+      // Mic was initialized externally (main.ts pre-load). Show status if not active.
+      this.hud.showMessage(micAnalyser.lastErrorMessage, 4000);
     }
 
     // Flashlight darkness overlay
@@ -250,8 +278,8 @@ export class Game {
     this.vignette.container.zIndex = 150;
     this.app.stage.addChild(this.vignette.container);
 
-    // Start heartbeat (AudioContext valid after user gesture from title/click)
-    this.heartbeat.start();
+    // Start heartbeat (share Howler's AudioContext to avoid browser cap)
+    this.heartbeat.start(Howler.ctx);
 
     // Tab visibility: pause/resume audio
     this.visibilityHandler = () => {
@@ -265,6 +293,12 @@ export class Game {
 
     // Start ambient music for reception
     audioManager.crossfadeAmbient("reception_ambient");
+
+    // Intro sequence (once per page load)
+    if (!introPlayed) {
+      this.runIntroSequence();
+      return; // endIntroSequence() will unlock and continue setup
+    }
 
     this.locked = false;
 
@@ -368,6 +402,10 @@ export class Game {
     const dtMS = ticker.deltaMS;
 
     switch (this.state.phase) {
+      case "INTRO":
+        this.handleIntroTick(dtMS);
+        break;
+
       case "PLAYING":
         this.handlePlayingTick(dt, dtMS);
         break;
@@ -1003,6 +1041,7 @@ export class Game {
     const ids: AudioId[] = [
       "tape_01", "tape_02", "tape_03", "tape_04", "tape_05", "tape_06",
       "tape_map_fragment",
+      "intro_panel_1", "intro_panel_2", "intro_panel_3",
     ];
     for (const id of ids) {
       audioManager.stop(id);
@@ -1260,6 +1299,7 @@ export class Game {
       ctrl.abort();
     }
     this.armedRadioAborts.clear();
+    revokeRadioBlobs(this.state.radio.armedRadios);
     this.state.radio.armedRadios = [];
     this.hud.clearRadioTimer();
     this.hud.showRadioInventory(false);
@@ -1317,11 +1357,22 @@ export class Game {
         const elapsed = performance.now() - startTime;
         const t = Math.min(1, elapsed / durMs);
         onTick(t);
-        if (t < 1) requestAnimationFrame(tick);
-        else resolve();
+        if (t < 1) {
+          const id = requestAnimationFrame(tick);
+          this.activeRafIds.add(id);
+        } else {
+          resolve();
+        }
       };
       tick();
     });
+  }
+
+  private cancelAllRafs(): void {
+    for (const id of this.activeRafIds) {
+      cancelAnimationFrame(id);
+    }
+    this.activeRafIds.clear();
   }
 
   /** Wait until either timeout or R key is pressed. */
@@ -1414,6 +1465,7 @@ export class Game {
     this.state.inventory.delete("tape");
 
     // Reset radio state (world radios lost; carried radios went into shade)
+    revokeRadioBlobs(this.state.radio.armedRadios);
     this.state.radio = {
       carriedRadioId: null,
       armedRadios: [],
@@ -1480,7 +1532,7 @@ export class Game {
 
     // Audio
     audioManager.crossfadeAmbient("reception_ambient");
-    this.heartbeat.start();
+    this.heartbeat.start(Howler.ctx);
 
     // Reset run stats for new life
     this.state.runStats.startTimeMs = performance.now();
@@ -1645,10 +1697,156 @@ export class Game {
     this.app.stage.addChild(this.overlayContainer);
   }
 
+  // ── Intro panel sequence ──
+
+  private runIntroSequence(): void {
+    this.state.phase = "INTRO";
+    this.state.introPanelIndex = 0;
+    this.introTransitioning = false;
+    this.introEscHeldMs = 0;
+
+    this.introContainer = new Container();
+    this.introContainer.zIndex = 7000;
+    this.app.stage.sortableChildren = true;
+    this.app.stage.addChild(this.introContainer);
+
+    this.showIntroPanel(0);
+    audioManager.playOneShot("intro_panel_1");
+
+    // Canvas click advances panels
+    this.introClickHandler = () => {
+      if (!this.introTransitioning && this.state.phase === "INTRO") {
+        this.advanceIntroPanel();
+      }
+    };
+    this.app.canvas.addEventListener("pointerdown", this.introClickHandler);
+  }
+
+  private showIntroPanel(index: number): void {
+    if (!this.introContainer) return;
+
+    // Remove previous children
+    while (this.introContainer.children.length > 0) {
+      this.introContainer.removeChildAt(0);
+    }
+
+    const panelNames = ['panel-1', 'panel-2', 'panel-3'];
+    const alias = `intro:${panelNames[index]}`;
+    const texture = Assets.get<Texture>(alias);
+
+    if (!texture || texture === Texture.WHITE) {
+      console.error(`Missing intro panel texture: ${alias}`);
+      // Fallback: solid black panel
+      const fallback = new Graphics();
+      fallback.rect(0, 0, 1280, 720);
+      fallback.fill({ color: 0x000000 });
+      this.introContainer.addChild(fallback);
+      return;
+    }
+
+    const sprite = new Sprite(texture);
+    sprite.width = 1280;
+    sprite.height = 720;
+    sprite.x = 0;
+    sprite.y = 0;
+    this.introContainer.addChild(sprite);
+  }
+
+  private advanceIntroPanel(): void {
+    if (this.introTransitioning) return;
+    this.stopAllNarrations();
+
+    const currentIndex = this.state.introPanelIndex;
+
+    if (currentIndex >= 2) {
+      // Panel 3 was showing, end intro
+      this.endIntroSequence();
+      return;
+    }
+
+    // Fade to next panel
+    this.introTransitioning = true;
+    const nextIndex = (currentIndex + 1) as 0 | 1 | 2;
+
+    fadeTransition(
+      this.app.stage,
+      this.app.ticker,
+      () => {
+        this.state.introPanelIndex = nextIndex;
+        this.showIntroPanel(nextIndex);
+      },
+      600,
+    ).then(() => {
+      this.introTransitioning = false;
+      audioManager.playOneShot(`intro_panel_${nextIndex + 1}` as AudioId);
+    });
+  }
+
+  private endIntroSequence(): void {
+    if (this.introTransitioning) return;
+    this.stopAllNarrations();
+    this.introTransitioning = true;
+
+    fadeTransition(
+      this.app.stage,
+      this.app.ticker,
+      () => {
+        // Remove intro container
+        if (this.introContainer) {
+          this.app.stage.removeChild(this.introContainer);
+          this.introContainer.destroy({ children: true });
+          this.introContainer = null;
+        }
+
+        // Remove canvas click handler
+        if (this.introClickHandler) {
+          this.app.canvas.removeEventListener("pointerdown", this.introClickHandler);
+          this.introClickHandler = null;
+        }
+
+        // Transition to PLAYING
+        this.state.phase = "PLAYING";
+        introPlayed = true;
+        this.introTransitioning = false;
+
+        // Clear any held keys from the intro
+        this.input.clearAll();
+
+        // Finish the setup that start() deferred
+        this.locked = false;
+        this.state.runStats.startTimeMs = performance.now();
+        this.maybeShowReceptionTutorial();
+        this.maybePlayTutorialT0();
+      },
+      600,
+    );
+  }
+
+  private handleIntroTick(dtMS: number): void {
+    // Space or Enter to advance
+    if (!this.introTransitioning) {
+      if (this.input.justPressed("Space") || this.input.justPressed("Enter")) {
+        this.advanceIntroPanel();
+      }
+    }
+
+    // Hold Escape for 1 second to skip
+    if (this.input.isEscapeHeld()) {
+      this.introEscHeldMs += dtMS;
+      if (this.introEscHeldMs >= 1000) {
+        this.endIntroSequence();
+      }
+    } else {
+      this.introEscHeldMs = 0;
+    }
+  }
+
   // ── Restart ──
 
   private restart(): void {
     this.app.ticker.remove(this.tick, this);
+    this.cancelAllRafs();
+    this.hud.cancelFade();
     this.clearTutorialTimers();
 
     // Hide gameover stats
@@ -2413,17 +2611,15 @@ export class Game {
     const abortCtrl = new AbortController();
     this.armedRadioAborts.set(armedId, abortCtrl);
     synthesizeTTS(result.message, abortCtrl.signal)
-      .then((tts) => {
-        armed.ttsState = "ready";
-        armed.ttsBlobUrl = tts.blobUrl;
-      })
-      .catch((err) => {
-        if (err.name !== "AbortError") {
-          console.warn(
-            `[radio] TTS failed for ${armedId}, using fallback:`,
-            err.message,
-          );
+      .then((blobUrl) => {
+        if (blobUrl) {
+          armed.ttsState = "ready";
+          armed.ttsBlobUrl = blobUrl;
+        } else {
+          armed.ttsState = "failed";
         }
+      })
+      .catch(() => {
         armed.ttsState = "failed";
       });
   }
@@ -2772,6 +2968,13 @@ export class Game {
 
   private updateDecoyEffects(dtMS: number): void {
     for (const d of this.decoyEffects) d.update(dtMS);
+    this.decoyEffects = this.decoyEffects.filter((d) => {
+      if (d.done) {
+        d.destroy();
+        return false;
+      }
+      return true;
+    });
   }
 
   private isNearWorkbench(): boolean {

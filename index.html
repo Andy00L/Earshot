@@ -4,10 +4,76 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Earshot</title>
+  <link rel="preload" href="/atlas.json" as="fetch" crossorigin>
+  <link rel="preload" href="/title.png" as="image">
+
   <style>
     html, body { margin: 0; padding: 0; background: #0a0806; overflow: hidden; height: 100%; }
     body { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
     canvas { display: block; image-rendering: -webkit-optimize-contrast; max-height: 100vh; max-width: 100vw; }
+
+    /* Loading screen (visible by default, no JS required) */
+    #loading-screen {
+      position: fixed;
+      inset: 0;
+      background: #0a0a0a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9500;
+      transition: opacity 400ms ease-out;
+    }
+    #loading-screen.fading-out {
+      opacity: 0;
+      pointer-events: none;
+    }
+    .loading-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 24px;
+      max-width: 480px;
+      text-align: center;
+    }
+    .loading-title {
+      font-family: 'Courier New', monospace;
+      font-size: 72px;
+      font-weight: bold;
+      letter-spacing: 12px;
+      color: #fff;
+      text-shadow: 0 0 30px rgba(255, 60, 60, 0.4);
+      animation: glitch 4s infinite;
+    }
+    .loading-bar-track {
+      width: 320px;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    .loading-bar-fill {
+      height: 100%;
+      background: #8a1a1a;
+      width: 0%;
+      transition: width 200ms ease-out;
+    }
+    .loading-percent {
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.6);
+    }
+    .loading-hint {
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.4);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+    .loading-error {
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+      color: #ff4040;
+      display: none;
+    }
 
     /* Title screen */
     #title-screen {
@@ -316,6 +382,20 @@
   </style>
 </head>
 <body>
+  <!-- Loading screen (visible by default, hides after assets load) -->
+  <div id="loading-screen">
+    <div class="loading-content">
+      <div class="loading-title">EARSHOT</div>
+      <div class="loading-bar-track">
+        <div class="loading-bar-fill" id="loading-bar-fill"></div>
+      </div>
+      <div class="loading-percent" id="loading-percent">0%</div>
+      <div class="loading-hint">Headphones recommended.</div>
+      <div class="loading-error" id="loading-error">Loading failed. Refresh the page.</div>
+      <noscript><div style="color: #888; font-family: 'Courier New', monospace; font-size: 14px; margin-top: 16px;">JavaScript required.</div></noscript>
+    </div>
+  </div>
+
   <!-- Title screen -->
   <div id="title-screen">
     <div class="title-content">
