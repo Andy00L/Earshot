@@ -33,7 +33,11 @@ export type SfxId =
   | "locker_door_creak"
   | "desk_crouch"
   | "static_burst"
-  | "radio_throw";
+  | "radio_throw"
+  | "monster_dash_screech"
+  | "jumper_vent_creak"
+  | "jumper_peek_breath"
+  | "jumper_fakeout_hiss";
 
 export type RadioVoiceId =
   | "radio_intro"
@@ -317,6 +321,42 @@ export const AUDIO_CATALOG: Record<AudioId, AudioAsset> = {
     durationSec: 1,
     loop: false,
     volume: 0.5,
+  },
+
+  // LISTENER DASH SFX (Sound Effects API)
+  monster_dash_screech: {
+    id: "monster_dash_screech",
+    category: "sfx",
+    prompt: "Sudden burst of speed. Sharp violent intake of breath followed by a guttural roar accelerating in pitch. Predator-like shriek. Bones snapping. Wet aggressive snarl. Approximately 1.2 seconds. High intensity, panic-inducing.",
+    durationSec: 1.5,
+    loop: false,
+    volume: 1.0,
+  },
+
+  // JUMPER SFX (Sound Effects API)
+  jumper_vent_creak: {
+    id: "jumper_vent_creak",
+    category: "sfx",
+    prompt: "Slow rusty metal grate creaking open. Quiet but unsettling. Dry hinge groaning. Old metal flexing. Low tension. Approximately 1.5 seconds. Subtle, dread-inducing, NOT loud.",
+    durationSec: 1.8,
+    loop: false,
+    volume: 0.5,
+  },
+  jumper_peek_breath: {
+    id: "jumper_peek_breath",
+    category: "sfx",
+    prompt: "Slow wet shallow breathing through a metal grate. Faint raspy exhale. Almost silent inhale. Distant, muffled. Approximately 2 seconds. Creepy, malaise, NOT a roar. Like something watching from a hiding place.",
+    durationSec: 2.0,
+    loop: false,
+    volume: 0.45,
+  },
+  jumper_fakeout_hiss: {
+    id: "jumper_fakeout_hiss",
+    category: "sfx",
+    prompt: "Short aggressive hiss followed by retreat. Sharp inhale, brief snarl, then silence. Like a predator that decided not to attack. Approximately 1 second. Tense, unsettling.",
+    durationSec: 1.2,
+    loop: false,
+    volume: 0.7,
   },
 
   // RADIO OPERATOR VOICE (TTS)

@@ -51,6 +51,8 @@ export class Minimap {
   // reset only on full game restart (new Game instance).
   private visitedRooms = new Set<RoomId>();
   private currentRoom: RoomId | null = null;
+  private objectiveRooms: Set<RoomId> = new Set();
+  private objectivePulseTime = 0;
   private timeMs = 0;
   private fadeState: "hidden" | "fading_in" | "visible" = "hidden";
   private fadeElapsed = 0;
@@ -177,7 +179,12 @@ export class Minimap {
     this.updatePlayerDotPosition();
   }
 
-  /** Per-frame update: fade-in animation and player dot pulse. */
+  /** Mark rooms with active objectives (will pulse on the minimap). */
+  setObjectiveRooms(rooms: Set<RoomId>): void {
+    this.objectiveRooms = rooms;
+  }
+
+  /** Per-frame update: fade-in animation, player dot pulse, objective pulse. */
   update(dtMs: number): void {
     if (this.fadeState === "fading_in") {
       this.fadeElapsed += dtMs;
@@ -187,15 +194,21 @@ export class Minimap {
     }
 
     this.timeMs += dtMs;
+    this.objectivePulseTime += dtMs;
+
     if (this.playerDot && this.playerDot.visible) {
       const pulse = 1.0 + 0.075 * Math.sin((this.timeMs / PULSE_MS) * Math.PI * 2);
       this.playerDot.scale.set(this.dotBaseScaleX * pulse, this.dotBaseScaleY * pulse);
     }
+
+    this.retintRooms();
   }
 
   /** Reset all state. Used on full game restart. */
   reset(): void {
     this.visitedRooms.clear();
+    this.objectiveRooms.clear();
+    this.objectivePulseTime = 0;
     this.currentRoom = null;
     this.timeMs = 0;
     this.hide();
@@ -210,7 +223,15 @@ export class Minimap {
 
   private retintRooms(): void {
     for (const [roomId, tile] of this.roomTiles) {
-      if (this.visitedRooms.has(roomId)) {
+      if (this.objectiveRooms.has(roomId)) {
+        const phase = (this.objectivePulseTime % 1500) / 1500;
+        const intensity = 0.7 + 0.3 * Math.sin(phase * Math.PI * 2);
+        const r = Math.floor(0xff * intensity);
+        const g = Math.floor(0x88 * intensity);
+        const b = Math.floor(0x44 * intensity);
+        tile.tint = (r << 16) | (g << 8) | b;
+        tile.alpha = 1.0;
+      } else if (this.visitedRooms.has(roomId)) {
         tile.tint = 0xFFFFFF;
         tile.alpha = 1.0;
       } else {

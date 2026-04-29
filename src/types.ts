@@ -7,8 +7,18 @@ export type MonsterState =
   | "ATTACK"
   | "IDLE_HOWL";
 
-// Jumper states (ceiling ambush predator)
-export type JumperState = "dormant" | "triggered" | "falling" | "attacking" | "retreating";
+// Jumper states (ceiling + floor ambush predator)
+export type JumperState =
+  | "dormant"
+  | "peeking"
+  | "fake_attacking"
+  | "triggered"
+  | "falling"          // ceiling: drops from vent
+  | "emerging"         // floor: rises from vent grate
+  | "getting_up"       // floor: stands up after emerging
+  | "crawling"         // floor: walks toward player
+  | "attacking"
+  | "retreating";
 
 // Whisperer states (psychological drain ghost)
 export type WhispererState = "spawning" | "idle" | "fading" | "despawned";
@@ -25,7 +35,8 @@ export function isLoreTapeId(id: string): id is LoreTapeId {
 export interface JumperHotspot {
   x: number;
   ventY: number;
-  floorLevel?: "ground" | "upper"; // default "ground"
+  floorLevel?: "ground" | "upper";       // default "ground"
+  ventPosition?: "ceiling" | "floor";    // default "ceiling"
 }
 
 // Room IDs. Hub (reception) plus spokes.
@@ -99,6 +110,7 @@ export interface HidingState {
   active: boolean;
   spotId: string | null;
   kind: HidingSpotKind | null;
+  transitioning: boolean; // true during desk ENTERING / EXITING animations
 }
 
 export interface RunStats {
@@ -135,7 +147,7 @@ export function createInitialGameState(): GameState {
     breakerOn: false,
     hasMapFragment: false,
     hasShownReceptionTutorial: false,
-    hidingState: { active: false, spotId: null, kind: null },
+    hidingState: { active: false, spotId: null, kind: null, transitioning: false },
     radio: {
       carriedRadioId: null,
       armedRadios: [],

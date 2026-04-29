@@ -188,10 +188,112 @@
         "width": 226,
         "height": 154,
         "baselineY": 153
+      },
+      "arrow-guidance": {
+        "file": "assets/ui/arrow-guidance.png",
+        "width": 987,
+        "height": 835,
+        "baselineY": 834
+      },
+      "back-button": {
+        "file": "assets/ui/back-button.png",
+        "width": 1022,
+        "height": 1024,
+        "baselineY": 1023
+      },
+      "click-to-continue": {
+        "file": "assets/ui/click-to-continue.png",
+        "width": 1180,
+        "height": 522,
+        "baselineY": 521
+      },
+      "key-ctrl": {
+        "file": "assets/ui/key-ctrl.png",
+        "width": 1236,
+        "height": 590,
+        "baselineY": 589
+      },
+      "key-e": {
+        "file": "assets/ui/key-e.png",
+        "width": 937,
+        "height": 1099,
+        "baselineY": 1098
+      },
+      "key-g": {
+        "file": "assets/ui/key-g.png",
+        "width": 944,
+        "height": 919,
+        "baselineY": 918
+      },
+      "key-r": {
+        "file": "assets/ui/key-r.png",
+        "width": 944,
+        "height": 918,
+        "baselineY": 917
+      },
+      "label-climb": {
+        "file": "assets/ui/label-climb.png",
+        "width": 1825,
+        "height": 637,
+        "baselineY": 636
+      },
+      "label-craft": {
+        "file": "assets/ui/label-craft.png",
+        "width": 1837,
+        "height": 663,
+        "baselineY": 662
+      },
+      "label-crouch": {
+        "file": "assets/ui/label-crouch.png",
+        "width": 1944,
+        "height": 614,
+        "baselineY": 613
+      },
+      "label-grab": {
+        "file": "assets/ui/label-grab.png",
+        "width": 1501,
+        "height": 605,
+        "baselineY": 604
+      },
+      "label-hide": {
+        "file": "assets/ui/label-hide.png",
+        "width": 1570,
+        "height": 719,
+        "baselineY": 718
+      },
+      "label-interact": {
+        "file": "assets/ui/label-interact.png",
+        "width": 1911,
+        "height": 599,
+        "baselineY": 598
+      },
+      "label-pickup": {
+        "file": "assets/ui/label-pickup.png",
+        "width": 1825,
+        "height": 599,
+        "baselineY": 598
+      },
+      "label-restart": {
+        "file": "assets/ui/label-restart.png",
+        "width": 1943,
+        "height": 571,
+        "baselineY": 570
+      },
+      "label-throw": {
+        "file": "assets/ui/label-throw.png",
+        "width": 1965,
+        "height": 630,
+        "baselineY": 629
+      },
+      "mouse-click": {
+        "file": "assets/ui/mouse-click.png",
+        "width": 795,
+        "height": 1125,
+        "baselineY": 1124
       }
     },
     "boundingBox": {
-      "width": 1557,
+      "width": 1965,
       "height": 1254
     }
   },
@@ -1180,6 +1282,132 @@
         "baselineY": 297,
         "sourceAtlas": "player-crouch"
       },
+      "hide-desk-enter1": {
+        "file": "assets/player/hide-desk-enter1.png",
+        "width": 412,
+        "height": 365,
+        "baselineY": 364,
+        "sourceAtlas": "player-hide-desk-enter"
+      },
+      "hide-desk-enter2": {
+        "file": "assets/player/hide-desk-enter2.png",
+        "width": 512,
+        "height": 260,
+        "baselineY": 259,
+        "sourceAtlas": "player-hide-desk-enter"
+      },
+      "hide-desk-enter3": {
+        "file": "assets/player/hide-desk-enter3.png",
+        "width": 489,
+        "height": 212,
+        "baselineY": 211,
+        "sourceAtlas": "player-hide-desk-enter"
+      },
+      "hide-desk-enter4": {
+        "file": "assets/player/hide-desk-enter4.png",
+        "width": 437,
+        "height": 212,
+        "baselineY": 211,
+        "sourceAtlas": "player-hide-desk-enter"
+      },
+      "hide-desk-enter5": {
+        "file": "assets/player/hide-desk-enter5.png",
+        "width": 439,
+        "height": 212,
+        "baselineY": 211,
+        "sourceAtlas": "player-hide-desk-enter"
+      },
+      "hide-desk-enter6": {
+        "file": "assets/player/hide-desk-enter6.png",
+        "width": 445,
+        "height": 212,
+        "baselineY": 211,
+        "sourceAtlas": "player-hide-desk-enter"
+      },
+      "hide-desk-exit1": {
+        "file": "assets/player/hide-desk-exit1.png",
+        "width": 380,
+        "height": 250,
+        "baselineY": 249,
+        "sourceAtlas": "player-hide-desk-exit"
+      },
+      "hide-desk-exit2": {
+        "file": "assets/player/hide-desk-exit2.png",
+        "width": 376,
+        "height": 250,
+        "baselineY": 249,
+        "sourceAtlas": "player-hide-desk-exit"
+      },
+      "hide-desk-exit3": {
+        "file": "assets/player/hide-desk-exit3.png",
+        "width": 375,
+        "height": 254,
+        "baselineY": 253,
+        "sourceAtlas": "player-hide-desk-exit"
+      },
+      "hide-desk-exit4": {
+        "file": "assets/player/hide-desk-exit4.png",
+        "width": 446,
+        "height": 268,
+        "baselineY": 267,
+        "sourceAtlas": "player-hide-desk-exit"
+      },
+      "hide-desk-exit5": {
+        "file": "assets/player/hide-desk-exit5.png",
+        "width": 512,
+        "height": 335,
+        "baselineY": 334,
+        "sourceAtlas": "player-hide-desk-exit"
+      },
+      "hide-desk-exit6": {
+        "file": "assets/player/hide-desk-exit6.png",
+        "width": 414,
+        "height": 391,
+        "baselineY": 390,
+        "sourceAtlas": "player-hide-desk-exit"
+      },
+      "hide-desk-idle1": {
+        "file": "assets/player/hide-desk-idle1.png",
+        "width": 457,
+        "height": 286,
+        "baselineY": 285,
+        "sourceAtlas": "player-hide-desk-idle"
+      },
+      "hide-desk-idle2": {
+        "file": "assets/player/hide-desk-idle2.png",
+        "width": 512,
+        "height": 287,
+        "baselineY": 286,
+        "sourceAtlas": "player-hide-desk-idle"
+      },
+      "hide-desk-idle3": {
+        "file": "assets/player/hide-desk-idle3.png",
+        "width": 507,
+        "height": 286,
+        "baselineY": 285,
+        "sourceAtlas": "player-hide-desk-idle"
+      },
+      "hide-desk-idle4": {
+        "file": "assets/player/hide-desk-idle4.png",
+        "width": 463,
+        "height": 286,
+        "baselineY": 285,
+        "sourceAtlas": "player-hide-desk-idle"
+      },
+      "hide-desk-idle5": {
+        "file": "assets/player/hide-desk-idle5.png",
+        "width": 465,
+        "height": 286,
+        "baselineY": 285,
+        "sourceAtlas": "player-hide-desk-idle"
+      },
+      "hide-desk-idle6": {
+        "file": "assets/player/hide-desk-idle6.png",
+        "width": 462,
+        "height": 287,
+        "baselineY": 286,
+        "sourceAtlas": "player-hide-desk-idle"
+      },
       "run1": {
         "file": "assets/player/run1.png",
         "width": 365,
@@ -1266,7 +1494,7 @@
       }
     },
     "boundingBox": {
-      "width": 434,
+      "width": 512,
       "height": 418
     }
   },

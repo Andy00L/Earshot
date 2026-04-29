@@ -6,7 +6,7 @@ Total disk size: 75 MB (images ~71 MB, audio ~4.1 MB, other ~74 KB)
 
 ## Summary
 
-- Assets used: 189 (142 images, 46 audio, 1 other)
+- Assets used: 193 (142 images, 50 audio, 1 other)
 - Assets unused on disk: 83 (76 images, 6 audio, 1 other)
 - Assets ambiguous: 6 (whisperer idle frames)
 - Code references missing files: 3 (all audio)
@@ -45,15 +45,15 @@ Total disk size: 75 MB (images ~71 MB, audio ~4.1 MB, other ~74 KB)
 
 #### Partial entity groups (some frames used, some not)
 
-**Jumper** - 18 of 48 frames unused:
+**Jumper** - 6 of 48 frames unused:
 
 | Frames | Size | Reason |
 |--------|------|--------|
-| `jumper/getup1-6` | ~650 KB | No JumperState maps to "getup" prefix. `STATE_FRAME_PREFIX` has: dormant->idle, triggered->emerge, falling->fall, attacking->attack, retreating->retreat |
 | `jumper/run1-6` | ~640 KB | No JumperState maps to "run" prefix |
-| `jumper/walk1-6` | ~740 KB | No JumperState maps to "walk" prefix |
 
-**Player** - 12 of 31 frames unused:
+Note: `jumper/getup1-6` USED by floor variant states `emerging`, `fake_attacking`, `getting_up` (per-variant frame remap, Hotfix H). `jumper/walk1-6` USED by floor `crawling` and `retreating` (reversed playback). `jumper/emerge1-6` and `jumper/retreat1-6` now ceiling-variant only.
+
+**Player** - 12 of 49 frames unused (18 new hide-desk frames are USED, wired in Prompt 2):
 
 | Frames | Size | Reason |
 |--------|------|--------|
@@ -118,7 +118,7 @@ Total disk size: 75 MB (images ~71 MB, audio ~4.1 MB, other ~74 KB)
 | `workbench/tool-rack` | 170 KB | Same |
 | `workbench/crate` | 229 KB | Same |
 
-**UI** - 7 of 11 frames unused:
+**UI** - 7 of 28 frames unused (16 new indicator frames + arrow-guidance are USED, wired in Prompt 3):
 
 | Frames | Size | Reason |
 |--------|------|--------|
@@ -190,8 +190,8 @@ The `gameover` background was likely used before the death flow was changed to `
 ## Section 4. Asset Categories Breakdown
 
 ### Sprites - Player
-- Total frames in atlas: 31
-- Used in animation states: 19
+- Total frames in atlas: 49
+- Used in animation states: 37 (19 existing + 18 new hide-desk frames: enter1-6, idle1-6, exit1-6)
 - Unused: 12 (scared variants, extra death frames, run-stop, run-look-back, standalone crouch)
 
 ### Sprites - Monster (Listener)
@@ -201,8 +201,8 @@ The `gameover` background was likely used before the death flow was changed to `
 
 ### Sprites - Jumper
 - Total frames in atlas: 48
-- Used: 30 (idle, emerge, fall, attack, retreat - 6 frames each)
-- Unused: 18 (getup, run, walk - 6 frames each)
+- Used: 42 (idle, emerge, fall, attack, retreat, getup, walk - 6 frames each)
+- Unused: 6 (run - 6 frames)
 
 ### Sprites - Whisperer
 - Total frames in atlas: 24
@@ -235,7 +235,7 @@ The `gameover` background was likely used before the death flow was changed to `
 - Total: 6 | Used: 1 (bench) | Unused: 5 (bench-glow, crafting, finished-item, tool-rack, crate)
 
 ### Sprites - UI
-- Total: 11 | Used: 4 (beacon-meter-fill/frame, inventory-slot-empty/selected) | Unused: 7
+- Total: 28 | Used: 21 (4 existing + 16 new indicator + arrow-guidance: back-button, click-to-continue, key-ctrl/e/g/r, label-climb/craft/crouch/grab/hide/interact/pickup/restart/throw, mouse-click, arrow-guidance) | Unused: 7
 
 ### Sprites - Bookshelves
 - Total: 6 | Used: 0 | Unused: 6
@@ -256,7 +256,8 @@ The `gameover` background was likely used before the death flow was changed to `
 - Total in catalog: 8 (6 standard + 2 confused) | On disk: 8 | Missing: 0 | Used: 8
 
 ### Audio - SFX
-- Total in catalog: 16 | On disk: 14 | Missing: 2 (static_burst, radio_throw) | Used: 12 | On disk but never played: 2 (flashlight_click, player_breath_normal)
+- Total in catalog: 20 | On disk: 18 | Missing: 2 (static_burst, radio_throw) | Used: 16 | On disk but never played: 2 (flashlight_click, player_breath_normal)
+- New in Prompt 1: monster_dash_screech (Listener dash), jumper_vent_creak, jumper_peek_breath, jumper_fakeout_hiss (Jumper peek/fake-out). USED. Wired in Prompt 2 + Prompt 3.
 
 ### Audio - Radio Voice (pre-recorded hints)
 - Total in catalog: 4 | On disk: 4 | Used: 0 (radio system switched to runtime TTS)
@@ -337,7 +338,7 @@ These 6 files alone total ~9.6 MB.
 | `gameover.png` | 1 | 1.2 MB | Death flow uses respawn, not gameover screen. May want to retain if gameover screen is re-enabled |
 | `server-upper.png` | 1 | 2.7 MB | No code reference found. May have been planned for a split-level server room |
 | `ui/flare-light-overlay.png` | 1 | 1.3 MB | FlareEffect uses Graphics for glow. Texture appears unused |
-| Jumper getup/run/walk | 18 | ~2.0 MB | No JumperState maps to these prefixes. May be planned for future phases |
+| Jumper run | 6 | ~640 KB | No JumperState maps to "run" prefix. getup and walk now USED by floor variant |
 | Player scared/dead variants | 12 | ~1.4 MB | Not in any animation state. May be planned for future phases |
 | Partial effect frames (flare igniting/dying, smokebomb ignited, decoy armed/peak, shade recorder-active/finished) | 9 | ~1.3 MB | Effect classes don't use these transition frames |
 | Vent variants (closed/eyes/bent/sealed) | 4 | ~840 KB | Only `open` and `drip` are used |

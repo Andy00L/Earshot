@@ -4,7 +4,7 @@
 
 ## System Overview
 
-Earshot is a browser-based 2D horror game with 34 TypeScript source files, 4 Python pipeline scripts, 1 TypeScript pipeline script, and 1 HTML entry point. The game runs on Pixi.js for rendering and Howler.js for audio. The player's real microphone feeds into a suspicion system that drives a 6-state monster AI.
+Earshot is a browser-based 2D horror game with 35 TypeScript source files, 4 Python pipeline scripts, 1 TypeScript pipeline script, and 1 HTML entry point. The game runs on Pixi.js for rendering and Howler.js for audio. The player's real microphone feeds into a suspicion system that drives a 6-state monster AI.
 
 ```mermaid
 graph TD
@@ -16,7 +16,7 @@ graph TD
         subgraph "Game Logic"
             GAME --> PLAYER[player.ts<br>8 animation states]
             GAME --> MONSTER[monster.ts<br>6-state AI FSM]
-            GAME --> JUMPER[jumper.ts<br>Ceiling ambush]
+            GAME --> JUMPER[jumper.ts<br>Ceiling+floor ambush]
             GAME --> WHISPERER[whisperer.ts<br>Beacon drain ghost]
             GAME --> ROOMS_MGR[rooms.ts<br>5 room definitions]
             GAME --> INPUT[input.ts<br>Keyboard + edge detect]
@@ -41,6 +41,7 @@ graph TD
             GAME --> VIGNETTE[vignette.ts<br>Edge darkening]
             GAME --> SHAKE[screen-shake.ts<br>Camera jitter]
             GAME --> TRANSITION[transition.ts<br>Fade to black]
+            GAME --> GARROW[guidance-arrow.ts<br>Objective arrow]
         end
 
         subgraph "UI Overlay"
@@ -90,7 +91,7 @@ Eleven labs/
     input.ts               Key state tracking, edge detection
     player.ts              Sprite, 8 states, movement physics
     monster.ts             AI FSM, suspicion tracking, lure mechanics
-    jumper.ts              Ceiling ambush predator (5-state: dormant, triggered, falling, attacking, retreating)
+    jumper.ts              Ceiling and floor ambush predator (10-state, per-variant frame prefix maps to avoid baked-vent artifacts on floor)
     whisperer.ts           Psychological drain ghost (4-state: spawning, idle, fading, despawned)
     rooms.ts               ROOM_DEFINITIONS constant, RoomManager class
     room.ts                Background sprite container
@@ -104,21 +105,22 @@ Eleven labs/
     smokebomb-effect.ts    Smoke bomb area effect
     decoy-effect.ts        Decoy radio broadcast effect
     audio.ts               AudioManager singleton (Howler wrapper)
-    audio-catalog.ts       AUDIO_CATALOG constant (56 entries)
+    audio-catalog.ts       AUDIO_CATALOG constant (60 entries)
     mic.ts                 MicAnalyser singleton (Web Audio)
     suspicion.ts           rmsToSuspicionPerSec(), suspicionDeltaForFrame()
     tts.ts                 synthesizeTTS() (ElevenLabs POST)
-    hud.ts                 HUD class (beacon meter, prompts, subtitles, inventory slots, hosts Minimap)
+    hud.ts                 HUD class (beacon meter, sprite/text prompts, subtitles, inventory slots, hosts Minimap)
     minimap.ts             Minimap class (parchment sprites, 5-room layout, visited tracking, player dot pulse)
     flashlight.ts          Flashlight class (canvas radial gradient)
     vignette.ts            Vignette class (Pixi graphics)
     screen-shake.ts        ScreenShake class (random offset + decay)
     heartbeat.ts           Heartbeat class (Web Audio oscillators)
     radio-popup.ts         RadioPopup class (DOM modal)
+    guidance-arrow.ts      GuidanceArrow class (floating objective pointer above player head)
     transition.ts          fadeTransition() async function
   scripts/
     slice.py               Pipeline orchestrator (~550 lines)
-    atlas_config.py        ATLAS_PROFILES dict (53 entries)
+    atlas_config.py        ATLAS_PROFILES dict (73 entries)
     chroma.py              HSV chroma key, despill, feathering
     detect.py              CCL 8-connectivity, morphological closing
     generate-audio.ts      ElevenLabs audio asset generator CLI
@@ -126,7 +128,7 @@ Eleven labs/
   assets/
     atlas.json             Generated sprite manifest
     audio/                 56 MP3 files
-    player/                31 PNGs
+    player/                49 PNGs
     monster/               27 PNGs
     props/                 12 PNGs
     *.png                  Room backgrounds, title, gameover
@@ -195,7 +197,7 @@ stateDiagram-v2
 
     note right of PATROL : Speed 1.5, wanders patrol zone
     note right of HUNT : Speed 2.1, moves toward player
-    note right of CHARGE : Speed 4.5, rushes player
+    note right of CHARGE : Speed 4.5 (6.75 on dash), rushes player. 25% dash burst for 600ms
 ```
 
 Key constants:
@@ -203,6 +205,7 @@ Key constants:
 - `SUSPICION_ALERT` = 30, `SUSPICION_HUNT` = 60, `SUSPICION_LOST` = 20
 - `CHARGE_TRIGGER` = 200px, `ATTACK_TRIGGER` = 80px, `CATCH_DIST` = 80px
 - `ALERT_WINDUP_MS` = 1500, `CHARGE_MAX_MS` = 1000, `ATTACK_DURATION_MS` = 800
+- `DASH_PROBABILITY` = 0.25, `DASH_SPEED_MULT` = 1.5, `DASH_DURATION_MS` = 600
 
 The `startLure()` method is called when a radio bait detonates. It overrides the monster's hunt target to the radio's position for 5 seconds, forces HUNT state, and adds +40 suspicion. After the lure expires, normal player tracking resumes.
 
@@ -218,8 +221,12 @@ The `startLure()` method is called when a radio bait detonates. It overrides the
 | CROUCH_IDLE | crouch-idle1-2 | 0 |
 | CROUCH_WALK | crouch-walk1-4 | 1.2 px/frame |
 | HIDING_LOCKER | (hidden) | 0 |
-| HIDING_DESK | (hidden) | 0 |
+| HIDING_DESK_ENTERING | hide-desk-enter1-6 | 0 |
+| HIDING_DESK_IDLE | hide-desk-idle1-6 | 0 |
+| HIDING_DESK_EXITING | hide-desk-exit1-6 | 0 |
 | CAUGHT | caught1-3 + death frames | 0 |
+
+HIDING_DESK_ENTERING and HIDING_DESK_EXITING use `loop: false` with `nextState` auto-transition (ENTERING -> IDLE, EXITING -> IDLE). Input is blocked during these transitions via `hidingState.transitioning`.
 
 Movement is clamped to `[50, roomWidth - 50]`. The player's Y position is anchored to the room's `floorY` using each frame's `baselineY` value from the atlas manifest.
 
@@ -298,10 +305,13 @@ Each `RoomDefinition` contains:
 | 0 | Room background, decorative props, door sprites |
 | 5 | Upper floor background (Server) |
 | 10 | Catwalk surface strip (TilingSprite, Server upper floor) |
+| 15 | Jumper container, peeking states (dormant, peeking) |
+| 20 | dripSprite (wall vent grate overlay) |
 | 30 | Ladder sprites |
 | 50 | Player |
-| 55 | Hatch sprite (above player at ladder top) |
+| 55 | Guidance arrow, hatch sprite (above player at ladder top) |
 | 80 | Foreground props (cubicle dividers) |
+| 90 | Jumper container, active states (fake_attacking, emerging, getting_up, crawling, attacking, retreating) |
 
 #### Stage-level layers (app.stage, sortableChildren=true)
 
@@ -309,8 +319,8 @@ Each `RoomDefinition` contains:
 |--------|---------|
 | 100 | Flashlight canvas overlay |
 | 150 | Vignette overlay |
-| 5000 | HUD (suspicion meter, prompts) |
-| 7000 | Intro panel container (3 panels, one visible at a time, each with a TTS voiceover narration via Adam voice) |
+| 5000 | HUD (suspicion meter, sprite/text prompts) |
+| 7000 | Intro panel container (3 panels with click-to-continue indicator, back button on panels 2-3, TTS voiceover via Adam voice) |
 | 9500 | Loading screen (HTML, removed after boot) |
 | 10000 | Fade transition overlay (temporary, during room changes) |
 

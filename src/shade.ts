@@ -1,5 +1,13 @@
 import { Container, Sprite, Texture } from "pixi.js";
 
+// Visual shrink factor for the loot bag. Reduces the shade sprite and
+// glow halo proportionally. Tune in one place if the bag footprint
+// needs adjustment. Does NOT affect pickup hitbox (fixed 80 px radius).
+const LOOT_VISUAL_SHRINK = 0.65;
+if (LOOT_VISUAL_SHRINK <= 0 || LOOT_VISUAL_SHRINK > 2) {
+  throw new Error(`LOOT_VISUAL_SHRINK out of range: ${LOOT_VISUAL_SHRINK}`);
+}
+
 /**
  * Visual representation of the shade (death-drop inventory pile).
  * The stageContainer is added to the stage above the flashlight darkness layer
@@ -32,12 +40,15 @@ export class ShadeVisual {
     this.glow = new Sprite(glowTexture);
     this.glow.anchor.set(0.5, 0.5);
     this.glow.alpha = 0.7;
+    this.glow.scale.set(LOOT_VISUAL_SHRINK);
     this.stageContainer.addChild(this.glow);
 
     // Shade pile sprite (3-frame pulse loop at ~3 fps)
     this.frames = frames;
     this.sprite = new Sprite(frames[0]);
     this.sprite.anchor.set(0.5, 1.0);
+    const shadeScale = (220 * LOOT_VISUAL_SHRINK) / this.sprite.texture.height;
+    this.sprite.scale.set(shadeScale);
     this.stageContainer.addChild(this.sprite);
   }
 

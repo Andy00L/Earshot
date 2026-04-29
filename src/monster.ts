@@ -39,6 +39,11 @@ const CHARGE_TRIGGER = 200;
 const ATTACK_TRIGGER = 80;
 const CATCH_DIST = 80;
 
+// Dash burst: 25% chance during CHARGE state
+const DASH_PROBABILITY = 0.25;
+const DASH_SPEED_MULT = 1.5;
+const DASH_DURATION_MS = 600;
+
 // States where the monster can catch the player
 const CATCH_STATES: MonsterState[] = ["HUNT", "CHARGE", "ATTACK", "IDLE_HOWL"];
 
@@ -90,6 +95,9 @@ export class Monster extends Container {
 
   // Generic state timer (reset on every state enter)
   private stateTimer = 0;
+
+  // Dash sub-mode of CHARGE
+  private isDashing = false;
 
   // Player reference for tracking
   private playerRef: { x: number };
@@ -168,6 +176,7 @@ export class Monster extends Container {
   }
 
   public onStateChange: ((state: MonsterState) => void) | null = null;
+  public onDashStart: (() => void) | null = null;
 
   update(dt: number, dtMS: number): void {
     // Confused animation overrides normal frame cycling when lured
@@ -228,6 +237,16 @@ export class Monster extends Container {
 
     this.state = newState;
     this.stateTimer = 0;
+
+    // Dash sub-mode: roll once per CHARGE entry
+    if (newState === "CHARGE") {
+      this.isDashing = Math.random() < DASH_PROBABILITY;
+      if (this.isDashing) {
+        this.onDashStart?.();
+      }
+    } else {
+      this.isDashing = false;
+    }
 
     if (newState !== prevState) {
       this.onStateChange?.(newState);
@@ -323,10 +342,14 @@ export class Monster extends Container {
   }
 
   private updateCharge(dt: number): void {
+    let chargeSpeed = CHARGE_SPEED;
+    if (this.isDashing && this.stateTimer <= DASH_DURATION_MS) {
+      chargeSpeed = CHARGE_SPEED * DASH_SPEED_MULT;
+    }
     const targetX = this.getHuntTargetX();
     const dx = targetX - this.x;
     this.facing = dx > 0 ? 1 : -1;
-    this.x += this.facing * CHARGE_SPEED * dt;
+    this.x += this.facing * chargeSpeed * dt;
 
     if (Math.abs(dx) <= ATTACK_TRIGGER) {
       this.enterState("ATTACK");

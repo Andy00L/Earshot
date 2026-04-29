@@ -26,7 +26,7 @@ Open `http://localhost:5173`. Use these controls:
 | 1 | PATROL |
 | 2 | ALERT |
 | 3 | HUNT |
-| 4 | CHARGE |
+| 4 | CHARGE (Listener) |
 | 5 | ATTACK |
 | 6 | IDLE_HOWL |
 | 0 | Dump GameState to console |
@@ -46,6 +46,8 @@ stateDiagram-v2
     HUNT --> PATROL : suspicion < 20 (lost track)
     CHARGE --> ATTACK : within 80px of player
     CHARGE --> HUNT : 1s elapsed without contact
+
+    note right of CHARGE : 25% dash burst (1.5x speed for 600ms)
     ATTACK --> IDLE_HOWL : 0.8s animation complete
     IDLE_HOWL --> PATROL : 3s elapsed
 ```

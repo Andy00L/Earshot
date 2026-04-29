@@ -64,6 +64,8 @@ import { SmokeBombEffect } from "./smokebomb-effect";
 import { DecoyEffect } from "./decoy-effect";
 import { WorkbenchMenu } from "./workbench-menu";
 import { ShadeVisual } from "./shade";
+import { GuidanceArrow } from "./guidance-arrow";
+import { getFrameMeta } from "./assets";
 
 /** Revoke any outstanding TTS blob URLs to prevent memory leaks. */
 function revokeRadioBlobs(radios: { ttsBlobUrl?: string | null }[]): void {
@@ -88,6 +90,13 @@ let introPlayed = false;
 
 // localStorage key: set after all 4 tutorials complete; skips on future runs
 const TUTORIAL_SEEN_KEY = "earshot.tutorialSeen";
+
+// Per-panel click indicator layout
+const INTRO_INDICATOR_CONFIG: Record<0 | 1 | 2, { height: number; y: number }> = {
+  0: { height: 56, y: 560 },
+  1: { height: 56, y: 700 },
+  2: { height: 56, y: 700 },
+};
 
 export class Game {
   private app: Application;
@@ -167,6 +176,9 @@ export class Game {
     room: RoomId;
   } | null = null;
 
+  // Guidance arrow (points player toward next objective)
+  private guidanceArrow: GuidanceArrow | null = null;
+
   // Footstep SFX timing
   private footstepTimer = 0;
 
@@ -198,6 +210,12 @@ export class Game {
   private introTransitioning = false;
   private introClickHandler: ((e: PointerEvent) => void) | null = null;
   private introEscHeldMs = 0;
+  private introIndicator: Sprite | null = null;
+  private introIndicatorPulseTime = 0;
+  private introIndicatorBaseScale = 1;
+  private introPanelVoiceoverStartMs = 0;
+  private introPanelVoiceoverDurationMs = 0;
+  private introBackButton: Sprite | null = null;
 
   constructor(app: Application, manifest: Manifest) {
     this.app = app;
@@ -225,6 +243,12 @@ export class Game {
     this.player.x = this.rooms.currentDef.playerSpawnFromLeft;
     this.player.y = this.rooms.currentRoom.floorY;
     this.world.addChild(this.player);
+
+    // Wire desk hide animation callbacks
+    this.player.onDeskEnterComplete = () => {
+      this.state.hidingState.transitioning = false;
+    };
+    this.player.onDeskExitComplete = () => this.onDeskExitComplete();
 
     // Foreground layer renders above player (cubicle dividers, etc.)
     this.foregroundLayer = new Container();
@@ -259,6 +283,11 @@ export class Game {
       // Mic was initialized externally (main.ts pre-load). Show status if not active.
       this.hud.showMessage(micAnalyser.lastErrorMessage, 4000);
     }
+
+    // Guidance arrow (above player head, points toward next objective)
+    const playerIdleMeta = getFrameMeta(this.manifest, "player", "idle1");
+    this.guidanceArrow = new GuidanceArrow(playerIdleMeta.height);
+    this.world.addChild(this.guidanceArrow.container);
 
     // Flashlight darkness overlay
     this.flashlight = new Flashlight(
@@ -460,6 +489,9 @@ export class Game {
     }
     this.monster?.update(dt, dtMS);
 
+    // Guidance arrow
+    this.updateGuidanceArrow(dtMS);
+
     // Update Jumpers
     const playerCrouched = this.player.isCrouching();
     const playerOnUpper = this.playerFloorYOverride !== null;
@@ -621,7 +653,7 @@ export class Game {
     }
 
     // Minimap
-    this.hud.updateMinimap(this.state.currentRoom, this.state.hasMapFragment);
+    this.hud.updateMinimap(this.state.currentRoom, this.state.hasMapFragment, this.getObjectiveRooms());
 
     // Inventory slots HUD
     this.hud.updateInventorySlots(this.state.inventorySlots, this.state.selectedSlot);
@@ -643,6 +675,87 @@ export class Game {
     if (audioManager.has(id)) {
       audioManager.playOneShot(id);
     }
+  }
+
+  // ── Guidance arrow ──
+
+  private getArrowTarget(): { roomId: RoomId; itemX: number } | null {
+    if (this.state.hasMapFragment) return null;
+    if (!this.state.inventory.has("keycard")) {
+      return { roomId: "cubicles", itemX: 1600 };
+    }
+    if (!this.state.breakerOn) {
+      return { roomId: "server", itemX: 2600 };
+    }
+    return { roomId: "archives", itemX: 2000 };
+  }
+
+  private getDoorXTowardRoom(currentRoom: RoomId, targetRoom: RoomId): number | null {
+    if (currentRoom === targetRoom) return null;
+
+    const def = this.rooms.currentDef;
+    for (const door of def.doors ?? []) {
+      if (door.toRoom === targetRoom) {
+        return door.fromX;
+      }
+    }
+
+    // Indirect: route through reception (the hub)
+    if (currentRoom !== "reception") {
+      for (const door of def.doors ?? []) {
+        if (door.toRoom === "reception") {
+          return door.fromX;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  private computeArrowTargetX(): number | null {
+    const target = this.getArrowTarget();
+    if (!target) return null;
+
+    if (target.roomId === this.state.currentRoom) {
+      return target.itemX;
+    }
+    return this.getDoorXTowardRoom(this.state.currentRoom, target.roomId);
+  }
+
+  private getObjectiveRooms(): Set<RoomId> {
+    const rooms = new Set<RoomId>();
+    if (!this.state.hasMapFragment) return rooms;
+    // Once map is acquired, highlight remaining objectives + exit
+    if (!this.state.inventory.has("keycard")) rooms.add("cubicles");
+    if (!this.state.breakerOn) rooms.add("server");
+    rooms.add("stairwell");
+    return rooms;
+  }
+
+  private updateGuidanceArrow(dtMs: number): void {
+    if (!this.guidanceArrow) return;
+
+    if (this.state.phase !== "PLAYING") {
+      this.guidanceArrow.hide();
+      this.guidanceArrow.update(this.player.x, this.player.y, dtMs);
+      return;
+    }
+
+    if (this.state.hidingState.active) {
+      this.guidanceArrow.hide();
+      this.guidanceArrow.update(this.player.x, this.player.y, dtMs);
+      return;
+    }
+
+    const targetX = this.computeArrowTargetX();
+    if (targetX === null) {
+      this.guidanceArrow.hide();
+    } else {
+      this.guidanceArrow.show();
+      this.guidanceArrow.setDirection(targetX > this.player.x ? "right" : "left");
+    }
+
+    this.guidanceArrow.update(this.player.x, this.player.y, dtMs);
   }
 
   // ── Footstep SFX ──
@@ -698,6 +811,7 @@ export class Game {
 
   private handleInteraction(): void {
     if (!this.input.justInteracted()) return;
+    if (this.state.hidingState.transitioning) return;
 
     // Exit hide (E while hiding)
     if (this.state.hidingState.active) {
@@ -1178,7 +1292,7 @@ export class Game {
     audioManager.stopAllMonsterVocals();
 
     // Reset hiding state
-    this.state.hidingState = { active: false, spotId: null, kind: null };
+    this.state.hidingState = { active: false, spotId: null, kind: null, transitioning: false };
     this.deskChargeRolled = false;
     this.deskChargeFound = false;
     if (this.flashlight) this.flashlight.setHidingMode("none");
@@ -1247,6 +1361,10 @@ export class Game {
 
     // Wire vocal coupling (audio stays in Game, Monster stays pure)
     this.monster.onStateChange = (state) => this.handleMonsterStateChange(state);
+    this.monster.onDashStart = () => {
+      audioManager.playOneShot("monster_dash_screech");
+      this.screenShake.trigger(300, 10);
+    };
     // Start patrol breath for initial PATROL state
     audioManager.loop("monster_patrol_breath");
 
@@ -1275,8 +1393,11 @@ export class Game {
       const spot = this.hidingSpots.find(
         (s) => s.id === this.state.hidingState.spotId,
       );
-      if (spot) spot.isOccupied = false;
-      this.state.hidingState = { active: false, spotId: null, kind: null };
+      if (spot) {
+        spot.isOccupied = false;
+        spot.sprite.visible = true;
+      }
+      this.state.hidingState = { active: false, spotId: null, kind: null, transitioning: false };
       if (this.flashlight) this.flashlight.setHidingMode("none");
       this.hud.setHiddenVisible(false);
       this.hud.clearPrompt();
@@ -1750,6 +1871,85 @@ export class Game {
     sprite.x = 0;
     sprite.y = 0;
     this.introContainer.addChild(sprite);
+
+    this.addIntroIndicator();
+    this.addIntroBackButton();
+
+    // Track voiceover timing for indicator animation
+    this.introPanelVoiceoverStartMs = performance.now();
+    const panelAudioId = `intro_panel_${index + 1}` as AudioId;
+    this.introPanelVoiceoverDurationMs = audioManager.getDuration(panelAudioId) || 5000;
+  }
+
+  private addIntroIndicator(): void {
+    if (!this.introContainer) return;
+
+    const tex = Assets.get<Texture>("ui:click-to-continue");
+    if (!tex || tex === Texture.WHITE) {
+      console.warn("Missing intro click-to-continue sprite");
+      return;
+    }
+
+    const cfg = INTRO_INDICATOR_CONFIG[this.state.introPanelIndex];
+    this.introIndicator = new Sprite(tex);
+    this.introIndicator.height = cfg.height;
+    this.introIndicator.scale.x = this.introIndicator.scale.y;
+    this.introIndicatorBaseScale = this.introIndicator.scale.y;
+    this.introIndicator.anchor.set(0.5, 1);
+    this.introIndicator.x = 640;
+    this.introIndicator.y = cfg.y;
+    this.introIndicator.alpha = 0.4;
+    this.introContainer.addChild(this.introIndicator);
+    this.introIndicatorPulseTime = 0;
+  }
+
+  private addIntroBackButton(): void {
+    if (!this.introContainer) return;
+    if (this.state.introPanelIndex === 0) return;
+
+    const tex = Assets.get<Texture>("ui:back-button");
+    if (!tex || tex === Texture.WHITE) {
+      console.warn("Missing intro back-button sprite");
+      return;
+    }
+
+    this.introBackButton = new Sprite(tex);
+    this.introBackButton.height = 56;
+    this.introBackButton.scale.x = this.introBackButton.scale.y;
+    this.introBackButton.anchor.set(0, 0);
+    this.introBackButton.x = 24;
+    this.introBackButton.y = 24;
+    this.introBackButton.eventMode = "static";
+    this.introBackButton.cursor = "pointer";
+
+    this.introBackButton.on("pointerdown", (e: PointerEvent) => {
+      e.stopPropagation();
+      this.goBackIntroPanel();
+    });
+
+    this.introContainer.addChild(this.introBackButton);
+  }
+
+  private goBackIntroPanel(): void {
+    if (this.introTransitioning) return;
+    if (this.state.introPanelIndex === 0) return;
+
+    this.stopAllNarrations();
+    const prevIndex = (this.state.introPanelIndex - 1) as 0 | 1 | 2;
+
+    this.introTransitioning = true;
+    fadeTransition(
+      this.app.stage,
+      this.app.ticker,
+      () => {
+        this.state.introPanelIndex = prevIndex;
+        this.showIntroPanel(prevIndex);
+      },
+      600,
+    ).then(() => {
+      this.introTransitioning = false;
+      audioManager.playOneShot(`intro_panel_${prevIndex + 1}` as AudioId);
+    });
   }
 
   private advanceIntroPanel(): void {
@@ -1827,6 +2027,22 @@ export class Game {
     if (!this.introTransitioning) {
       if (this.input.justPressed("Space") || this.input.justPressed("Enter")) {
         this.advanceIntroPanel();
+      }
+    }
+
+    // Pulse the click-to-continue indicator
+    if (this.introIndicator && !this.introTransitioning) {
+      this.introIndicatorPulseTime += dtMS;
+      const elapsed = performance.now() - this.introPanelVoiceoverStartMs;
+      const voiceoverPlaying = elapsed < this.introPanelVoiceoverDurationMs;
+      if (voiceoverPlaying) {
+        const cycle = (this.introIndicatorPulseTime % 1500) / 1500;
+        this.introIndicator.alpha = 0.4 + 0.3 * Math.sin(cycle * Math.PI * 2);
+        this.introIndicator.scale.set(this.introIndicatorBaseScale);
+      } else {
+        this.introIndicator.alpha = Math.min(1.0, this.introIndicator.alpha + dtMS / 400);
+        const pulseFactor = 1.05 + 0.05 * Math.sin(this.introIndicatorPulseTime / 600);
+        this.introIndicator.scale.set(this.introIndicatorBaseScale * pulseFactor);
       }
     }
 
@@ -1941,6 +2157,9 @@ export class Game {
   // ── Hiding spots ──
 
   private updateHidingPrompts(): void {
+    // No prompts or movement-exit during enter/exit animation
+    if (this.state.hidingState.transitioning) return;
+
     if (this.state.hidingState.active) {
       this.hud.showPrompt("Press E to leave hiding spot");
       // Movement keys exit hide
@@ -1952,15 +2171,13 @@ export class Game {
 
     const nearestSpot = this.getNearestHidingSpot();
     if (nearestSpot) {
-      const label =
-        nearestSpot.kind === "locker" ? "in locker" : "under desk";
-      this.hud.showPrompt(`Press E to hide ${label}`);
+      this.hud.showSpritePrompt("key-e", "label-hide");
       return;
     }
 
     const nearbyRadio = this.getNearbyRadioPickup();
     if (nearbyRadio) {
-      this.hud.showPrompt("Press E to take radio");
+      this.hud.showSpritePrompt("key-e", "label-pickup");
       return;
     }
 
@@ -1969,40 +2186,39 @@ export class Game {
       if (!pickup.isInteractable()) continue;
       if (!pickup.isInRange(this.player.x)) continue;
       if (pickup.config.togglesTo) {
-        this.hud.showPrompt("Press E to flip switch");
+        this.hud.showSpritePrompt("key-e", "label-interact");
       } else if (isLoreTapeId(pickup.config.id)) {
-        this.hud.showPrompt("Press E to take tape");
+        this.hud.showSpritePrompt("key-e", "label-pickup");
       } else {
-        const name = pickup.config.id.replace(/_/g, " ");
-        this.hud.showPrompt(`Press E to take ${name}`);
+        this.hud.showSpritePrompt("key-e", "label-pickup");
       }
       return;
     }
 
     // Workbench prompt
     if (this.isNearWorkbench()) {
-      this.hud.showPrompt("Press E to open workbench");
+      this.hud.showSpritePrompt("key-e", "label-craft");
       return;
     }
 
     // Shade recovery prompt
     if (this.shadeVisual && this.state.activeShade &&
         this.shadeVisual.isPlayerInRange(this.player.x, this.player.y)) {
-      this.hud.showPrompt("Press E to recover inventory");
+      this.hud.showSpritePrompt("key-e", "label-grab");
       return;
     }
 
     // Vent prompt
     const vent = this.rooms.getNearbyVent(this.player.x);
     if (vent) {
-      this.hud.showPrompt("Press E to crawl through vent");
+      this.hud.showSpritePrompt("key-e", "label-climb");
       return;
     }
 
     // Door prompt
     const door = this.rooms.getNearbyDoor(this.player.x);
     if (door) {
-      this.hud.showPrompt("Press E to open door");
+      this.hud.showSpritePrompt("key-e", "label-interact");
       return;
     }
 
@@ -2039,8 +2255,10 @@ export class Game {
       active: true,
       spotId: spot.id,
       kind: spot.kind,
+      transitioning: spot.kind === "desk",
     };
     spot.isOccupied = true;
+    if (spot.kind === "desk") spot.sprite.visible = false;
 
     // Snap player to spot position
     this.player.x = spot.x;
@@ -2070,6 +2288,7 @@ export class Game {
 
   private tryExitHide(): void {
     if (!this.state.hidingState.active) return;
+    if (this.state.hidingState.transitioning) return;
     const spotId = this.state.hidingState.spotId!;
     const kind = this.state.hidingState.kind!;
     const spot = this.hidingSpots.find((s) => s.id === spotId);
@@ -2085,18 +2304,40 @@ export class Game {
       }
     }
 
-    this.state.hidingState = { active: false, spotId: null, kind: null };
+    if (kind === "desk") {
+      // Desk: trigger exit animation. State stays active until animation completes.
+      this.state.hidingState.transitioning = true;
+      this.player.startExitDeskHide();
+      return;
+    }
+
+    // Locker: instant exit (unchanged)
+    this.state.hidingState = { active: false, spotId: null, kind: null, transitioning: false };
     spot.isOccupied = false;
     this.player.setStandingPose();
     if (this.flashlight) this.flashlight.setHidingMode("none");
 
-    if (kind === "locker") {
-      audioManager.playOneShot("locker_open");
-    }
+    audioManager.playOneShot("locker_open");
 
     this.deskChargeRolled = false;
     this.deskChargeFound = false;
     this.hud.setHiddenVisible(false);
+  }
+
+  private onDeskExitComplete(): void {
+    const spotId = this.state.hidingState.spotId;
+    const spot = spotId ? this.hidingSpots.find((s) => s.id === spotId) : null;
+    if (spot) {
+      spot.isOccupied = false;
+      spot.sprite.visible = true;
+    }
+
+    this.state.hidingState = { active: false, spotId: null, kind: null, transitioning: false };
+    if (this.flashlight) this.flashlight.setHidingMode("none");
+    this.deskChargeRolled = false;
+    this.deskChargeFound = false;
+    this.hud.setHiddenVisible(false);
+    this.input.clearAll();
   }
 
   // ── Door sprites ──
@@ -2382,24 +2623,48 @@ export class Game {
     if (!def.jumperHotspots) return;
     const floorY = this.rooms.currentRoom.floorY;
 
+    // Mirror of FLOOR_VISUAL_SHRINK in jumper.ts. Kept as a local
+    // constant because game.ts does not import jumper internals.
+    // MUST stay equal to FLOOR_VISUAL_SHRINK.
+    const DRIP_SHRINK = 0.6;
+
     for (const hotspot of def.jumperHotspots) {
       // Upper-floor jumpers use the upper floor Y as their landing floor
       const jumperFloorY = (hotspot.floorLevel === "upper" && def.upperFloorY)
         ? def.upperFloorY
         : floorY;
 
-      // Place drip vent sprite at the hotspot
+      const isFloorVent = hotspot.ventPosition === "floor";
+
+      // Place vent sprite at the hotspot
       const dripTexture = Assets.get<Texture>("vents:drip");
       const dripSprite = new Sprite(dripTexture || Texture.WHITE);
-      dripSprite.anchor.set(0.5, 0.0);
-      dripSprite.x = hotspot.x;
-      dripSprite.y = hotspot.ventY;
-      dripSprite.scale.set(0.4);
+      if (isFloorVent) {
+        // Wall-mounted floor vent: match jumper idle sprite footprint,
+        // scaled down by DRIP_SHRINK.
+        dripSprite.anchor.set(0.5, 1.0);
+        dripSprite.x = hotspot.x;
+        dripSprite.y = jumperFloorY - 50;
+        dripSprite.height = 220 * DRIP_SHRINK;
+        dripSprite.width = 220 * (330 / 256) * DRIP_SHRINK;
+        dripSprite.zIndex = 20;
+      } else {
+        // Ceiling vent: existing behavior preserved
+        dripSprite.anchor.set(0.5, 0.0);
+        dripSprite.x = hotspot.x;
+        dripSprite.y = hotspot.ventY;
+        dripSprite.scale.set(0.4);
+        dripSprite.zIndex = 20;
+      }
       this.world.addChild(dripSprite);
       this.jumperDripSprites.push(dripSprite);
 
-      // Create the Jumper entity
-      const jumper = new Jumper(hotspot, jumperFloorY, this.manifest, this.world);
+      // Create the Jumper entity. Floor variants receive the dripSprite
+      // reference so the Jumper can toggle its visibility per state.
+      const jumper = new Jumper(
+        hotspot, jumperFloorY, this.manifest, this.world,
+        false, isFloorVent ? dripSprite : undefined,
+      );
       this.jumpers.push(jumper);
     }
   }

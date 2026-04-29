@@ -54,6 +54,36 @@ ATLAS_PROFILES = {
         ],
         "chroma_key": True,
     },
+    "player-hide-desk-enter.png": {
+        "type": "fixed_cell_strip",
+        "entity": "player",
+        "frame_count": 6,
+        "frames": [
+            "hide-desk-enter1", "hide-desk-enter2", "hide-desk-enter3",
+            "hide-desk-enter4", "hide-desk-enter5", "hide-desk-enter6",
+        ],
+        "chroma_key": True,
+    },
+    "player-hide-desk-exit.png": {
+        "type": "fixed_cell_strip",
+        "entity": "player",
+        "frame_count": 6,
+        "frames": [
+            "hide-desk-exit1", "hide-desk-exit2", "hide-desk-exit3",
+            "hide-desk-exit4", "hide-desk-exit5", "hide-desk-exit6",
+        ],
+        "chroma_key": True,
+    },
+    "player-hide-desk-idle.png": {
+        "type": "fixed_cell_strip",
+        "entity": "player",
+        "frame_count": 6,
+        "frames": [
+            "hide-desk-idle1", "hide-desk-idle2", "hide-desk-idle3",
+            "hide-desk-idle4", "hide-desk-idle5", "hide-desk-idle6",
+        ],
+        "chroma_key": True,
+    },
 
     # ── Monster character (4 atlases, one entity) ─────────────────────────
 
@@ -381,6 +411,108 @@ ATLAS_PROFILES = {
         "type": "single_chroma",
         "entity": "ui",
         "frames": ["flare-light-overlay"],
+        "chroma_key": True,
+    },
+    "ui-arrow-guidance.png": {
+        "type": "single_chroma",
+        "entity": "ui",
+        "frames": ["arrow-guidance"],
+        "chroma_key": True,
+    },
+    "ui-back-button.png": {
+        "type": "single_chroma",
+        "entity": "ui",
+        "frames": ["back-button"],
+        "chroma_key": True,
+    },
+    "ui-click-to-continue.png": {
+        "type": "single_chroma",
+        "entity": "ui",
+        "frames": ["click-to-continue"],
+        "chroma_key": True,
+    },
+    "ui-key-ctrl.png": {
+        "type": "single_chroma",
+        "entity": "ui",
+        "frames": ["key-ctrl"],
+        "chroma_key": True,
+    },
+    "ui-key-e.png": {
+        "type": "single_chroma",
+        "entity": "ui",
+        "frames": ["key-e"],
+        "chroma_key": True,
+    },
+    "ui-key-g.png": {
+        "type": "single_chroma",
+        "entity": "ui",
+        "frames": ["key-g"],
+        "chroma_key": True,
+    },
+    "ui-key-r.png": {
+        "type": "single_chroma",
+        "entity": "ui",
+        "frames": ["key-r"],
+        "chroma_key": True,
+    },
+    "ui-label-climb.png": {
+        "type": "single_chroma",
+        "entity": "ui",
+        "frames": ["label-climb"],
+        "chroma_key": True,
+    },
+    "ui-label-craft.png": {
+        "type": "single_chroma",
+        "entity": "ui",
+        "frames": ["label-craft"],
+        "chroma_key": True,
+    },
+    "ui-label-crouch.png": {
+        "type": "single_chroma",
+        "entity": "ui",
+        "frames": ["label-crouch"],
+        "chroma_key": True,
+    },
+    "ui-label-grab.png": {
+        "type": "single_chroma",
+        "entity": "ui",
+        "frames": ["label-grab"],
+        "chroma_key": True,
+    },
+    "ui-label-hide.png": {
+        "type": "single_chroma",
+        "entity": "ui",
+        "frames": ["label-hide"],
+        "chroma_key": True,
+    },
+    "ui-label-interact.png": {
+        "type": "single_chroma",
+        "entity": "ui",
+        "frames": ["label-interact"],
+        "chroma_key": True,
+    },
+    "ui-label-pickup.png": {
+        "type": "single_chroma",
+        "entity": "ui",
+        "frames": ["label-pickup"],
+        "chroma_key": True,
+    },
+    "ui-label-restart.png": {
+        "type": "single_chroma",
+        "entity": "ui",
+        "frames": ["label-restart"],
+        "chroma_key": True,
+    },
+    "ui-label-throw.png": {
+        "type": "single_chroma",
+        "entity": "ui",
+        "frames": ["label-throw"],
+        "chroma_key": True,
+    },
+    "ui-mouse-click.png": {
+        "type": "single_chroma",
+        "entity": "ui",
+        "frames": ["mouse-click"],
         "chroma_key": True,
     },
 

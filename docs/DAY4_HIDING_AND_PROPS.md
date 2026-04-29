@@ -21,11 +21,16 @@ All props use the `props:` tileset from `assets/atlas.json`.
 
 ### Desk (80% hidden)
 
-- Suspicion decay rate multiplied by 4 while hiding.
+- Suspicion decay rate multiplied by 4 while hiding. The 4x decay kicks in immediately on E press (during the entering animation), not after the animation completes.
 - Flashlight shrinks to 70% (slightly dimmer).
 - Monster in PATROL, ALERT, or HUNT walks past without detecting the player.
 - Monster in CHARGE has a 50% chance to find the player (rolled once when monster x crosses desk x boundary within 50px).
 - Audio: desk_crouch on enter.
+- Animation: 3-phase sequence using 18 dedicated frames (6 per phase).
+  - ENTERING: 6 frames, plays once (~250ms). Player is locked during this animation.
+  - IDLE: 6 frames, loops slowly (breathing/listening).
+  - EXITING: 6 frames, plays once (~250ms). Player is locked during this animation.
+- Input is blocked during ENTERING and EXITING transitions (no movement, no interaction).
 
 ### Shared behavior
 

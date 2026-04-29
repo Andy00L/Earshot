@@ -272,6 +272,79 @@ export class HUD {
     this.promptBox = box;
   }
 
+  /**
+   * Render a sprite-based prompt: [key icon] + [action label].
+   * Falls back to text via showPrompt() if a key sprite is missing from atlas.
+   */
+  showSpritePrompt(keyId: string, labelId: string | null): void {
+    const cacheKey = `${keyId}|${labelId ?? ""}`;
+    if (cacheKey === this.currentPromptStr && this.promptBox) return;
+    this.clearPrompt();
+    this.currentPromptStr = cacheKey;
+
+    const keyTex = Assets.get<Texture>(`ui:${keyId}`);
+    const labelTex = labelId ? Assets.get<Texture>(`ui:${labelId}`) : null;
+
+    if (!keyTex || keyTex === Texture.WHITE) {
+      console.warn(`Missing UI sprite ui:${keyId}, falling back to text`);
+      this.showPrompt(`Press ${this.fallbackKeyName(keyId)}`);
+      return;
+    }
+
+    const box = new Container();
+    const padding = 12;
+
+    const keySprite = new Sprite(keyTex);
+    keySprite.height = 48;
+    keySprite.scale.x = keySprite.scale.y; // preserve aspect
+    keySprite.x = padding;
+    keySprite.y = padding;
+    box.addChild(keySprite);
+
+    let totalWidth = padding + keySprite.width + padding;
+
+    if (labelTex && labelTex !== Texture.WHITE) {
+      const labelSprite = new Sprite(labelTex);
+      labelSprite.height = 32;
+      labelSprite.scale.x = labelSprite.scale.y;
+      labelSprite.x = padding + keySprite.width + 12;
+      labelSprite.y = padding + (keySprite.height - labelSprite.height) / 2;
+      box.addChild(labelSprite);
+      totalWidth = padding + keySprite.width + 12 + labelSprite.width + padding;
+    } else if (labelId) {
+      // labelId requested but sprite missing: fall back to text label
+      const labelText = new Text({
+        text: labelId.replace(/^label-/, "").toUpperCase(),
+        style: { fontFamily: "monospace", fontSize: 18, fill: 0xaaddff },
+      });
+      labelText.x = padding + keySprite.width + 12;
+      labelText.y = padding + (keySprite.height - labelText.height) / 2;
+      box.addChild(labelText);
+      totalWidth = padding + keySprite.width + 12 + labelText.width + padding;
+    }
+
+    const bg = new Graphics();
+    bg.roundRect(0, 0, totalWidth, keySprite.height + padding * 2, 6);
+    bg.fill({ color: 0x000000, alpha: 0.5 });
+    box.addChildAt(bg, 0);
+
+    box.x = 640 - totalWidth / 2;
+    box.y = 580;
+
+    this.container.addChild(box);
+    this.promptBox = box;
+  }
+
+  private fallbackKeyName(keyId: string): string {
+    const map: Record<string, string> = {
+      "key-e": "E",
+      "key-r": "R",
+      "key-g": "G",
+      "key-ctrl": "Ctrl",
+    };
+    return map[keyId] ?? keyId.replace(/^key-/, "").toUpperCase();
+  }
+
   clearPrompt(): void {
     this.currentPromptStr = "";
     if (this.promptBox) {
@@ -449,8 +522,11 @@ export class HUD {
     }
   }
 
-  updateMinimap(currentRoom: RoomId, hasMapFragment: boolean): void {
+  updateMinimap(currentRoom: RoomId, hasMapFragment: boolean, objectiveRooms?: Set<RoomId>): void {
     this.minimap.onRoomEnter(currentRoom);
+    if (objectiveRooms) {
+      this.minimap.setObjectiveRooms(objectiveRooms);
+    }
     if (hasMapFragment) {
       this.minimap.show();
     } else {

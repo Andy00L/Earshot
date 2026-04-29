@@ -22,7 +22,7 @@ export const ROOM_DEFINITIONS: Record<RoomId, RoomDefinition> = {
       {
         id: "tape",
         room: "reception",
-        x: 2000,
+        x: 2100,
         y: -40,
         frame: "materials:tape",
         pickupRange: 100,
@@ -115,7 +115,7 @@ export const ROOM_DEFINITIONS: Record<RoomId, RoomDefinition> = {
       {
         id: "tape_02",
         room: "cubicles",
-        x: 2700,
+        x: 2300,
         y: -20,
         frame: "shade-tape:recorder",
         pickupRange: 100,
@@ -140,7 +140,7 @@ export const ROOM_DEFINITIONS: Record<RoomId, RoomDefinition> = {
     hidingSpots: [
       { id: "desk_cub_1", kind: "desk", x: 1200, y: 866, triggerWidth: 100 },
       { id: "locker_cub_1", kind: "locker", x: 2050, y: 866, triggerWidth: 80 },
-      { id: "desk_cub_2", kind: "desk", x: 2900, y: 866, triggerWidth: 100 },
+      { id: "desk_cub_2", kind: "desk", x: 2500, y: 866, triggerWidth: 100 },
     ],
     decorativeProps: [
       { id: "vent_cub_1", frameName: "vent", x: 600, y: 200, scale: 0.5 },
@@ -161,11 +161,12 @@ export const ROOM_DEFINITIONS: Record<RoomId, RoomDefinition> = {
       { radioId: "radio_cub", x: 1800, y: 866, pickupRange: 100 },
     ],
     vents: [
-      { x: 3100, target: "stairwell", targetX: 200 },
+      { x: 3050, target: "stairwell", targetX: 350 },
     ],
     jumperHotspots: [
-      { x: 1200, ventY: 100 },
-      { x: 2400, ventY: 100 },
+      { x: 1500, ventY: 100, ventPosition: "ceiling" },
+      { x: 550, ventY: 100, ventPosition: "floor" },
+      { x: 2700, ventY: 100, ventPosition: "floor" },
     ],
   },
 
@@ -181,7 +182,7 @@ export const ROOM_DEFINITIONS: Record<RoomId, RoomDefinition> = {
       {
         id: "breaker_switch",
         room: "server",
-        x: 2600,
+        x: 2700,
         y: -100,
         frame: "breaker-off",
         pickupRange: 100,
@@ -190,7 +191,7 @@ export const ROOM_DEFINITIONS: Record<RoomId, RoomDefinition> = {
       {
         id: "wire",
         room: "server",
-        x: 2100,
+        x: 2000,
         y: 0,
         frame: "materials:wire",
         pickupRange: 100,
@@ -198,7 +199,7 @@ export const ROOM_DEFINITIONS: Record<RoomId, RoomDefinition> = {
       {
         id: "tape_03",
         room: "server",
-        x: 600,
+        x: 400,
         y: -20,
         frame: "shade-tape:recorder",
         pickupRange: 100,
@@ -235,8 +236,9 @@ export const ROOM_DEFINITIONS: Record<RoomId, RoomDefinition> = {
       { radioId: "radio_server", x: 2200, y: 866, pickupRange: 100 },
     ],
     jumperHotspots: [
-      { x: 1800, ventY: 100, floorLevel: "upper" },
-      { x: 2700, ventY: 100 },
+      { x: 1800, ventY: 100, floorLevel: "upper", ventPosition: "ceiling" },
+      { x: 950, ventY: 100, ventPosition: "ceiling" },
+      { x: 2450, ventY: 100, ventPosition: "floor" },
     ],
     // Upper floor (two-story Server room)
     upperBg: "server-upper",
@@ -291,11 +293,12 @@ export const ROOM_DEFINITIONS: Record<RoomId, RoomDefinition> = {
       { id: "exit_sign_stairwell", frameName: "exit-sign", x: 2700, y: 350, scale: 0.7, alpha: 0.9 },
     ],
     vents: [
-      { x: 200, target: "cubicles", targetX: 3100 },
+      { x: 350, target: "cubicles", targetX: 3050 },
     ],
     jumperHotspots: [
-      { x: 1500, ventY: 100 },
-      { x: 2700, ventY: 100 },
+      { x: 1750, ventY: 100, ventPosition: "ceiling" },
+      { x: 2700, ventY: 100, ventPosition: "ceiling" },
+      { x: 600, ventY: 100, ventPosition: "floor" },
     ],
     whispererCanSpawn: true,
     whispererSpawnChance: 0.40,
@@ -313,7 +316,7 @@ export const ROOM_DEFINITIONS: Record<RoomId, RoomDefinition> = {
       {
         id: "battery",
         room: "archives",
-        x: 1200,
+        x: 1100,
         y: 0,
         frame: "materials:battery",
         pickupRange: 100,
@@ -329,7 +332,7 @@ export const ROOM_DEFINITIONS: Record<RoomId, RoomDefinition> = {
       {
         id: "tape_04",
         room: "archives",
-        x: 1700,
+        x: 1800,
         y: -20,
         frame: "shade-tape:recorder",
         pickupRange: 100,
@@ -337,7 +340,7 @@ export const ROOM_DEFINITIONS: Record<RoomId, RoomDefinition> = {
       {
         id: "tape_05",
         room: "archives",
-        x: 400,
+        x: 500,
         y: -20,
         frame: "shade-tape:recorder",
         pickupRange: 100,
