@@ -87,12 +87,12 @@ export class AudioManager {
     this.currentAmbientHowl = next.howl;
   }
 
-  playOneShot(id: AudioId): number | null {
+  playOneShot(id: AudioId, volumeMultiplier = 1.0): number | null {
     const managed = this.sounds.get(id);
     if (!managed) return null;
     // Reset loop to catalog default (prevents looping after loop() was called)
     managed.howl.loop(AUDIO_CATALOG[id].loop);
-    managed.howl.volume(managed.baseVolume * this.masterVolume);
+    managed.howl.volume(managed.baseVolume * this.masterVolume * volumeMultiplier);
     return managed.howl.play();
   }
 
@@ -106,6 +106,19 @@ export class AudioManager {
 
   stop(id: AudioId): void {
     this.sounds.get(id)?.howl.stop();
+  }
+
+  /** Update the playback volume for a loaded sound (0-1 multiplier of base volume). */
+  setVolume(id: AudioId, volumeMultiplier: number): void {
+    const managed = this.sounds.get(id);
+    if (managed) {
+      managed.howl.volume(managed.baseVolume * this.masterVolume * Math.max(0, Math.min(1, volumeMultiplier)));
+    }
+  }
+
+  isPlaying(id: AudioId): boolean {
+    const managed = this.sounds.get(id);
+    return managed ? managed.howl.playing() : false;
   }
 
   getDuration(id: AudioId): number {

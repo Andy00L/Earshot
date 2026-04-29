@@ -49,7 +49,7 @@ import {
   RMS_THRESHOLD_SHOUT,
 } from "./beacon";
 import { Flashlight } from "./flashlight";
-import { Jumper } from "./jumper";
+import { Jumper, JumperVfxEvent } from "./jumper";
 import { Whisperer } from "./whisperer";
 import { AmbientId, AudioId, LORE_TAPE_TRANSCRIPTS, MAP_FRAGMENT_TRANSCRIPT, TUTORIAL_TRANSCRIPTS } from "./audio-catalog";
 import { RadioPopup } from "./radio-popup";
@@ -160,6 +160,13 @@ export class Game {
   private screenShake = new ScreenShake();
   private heartbeat = new Heartbeat();
   private vignette: Vignette | null = null;
+
+  // Jumper VFX state
+  private vignetteFlashGraphics: Graphics | null = null;
+  private vignetteFlashTimer = 0;
+  private vignetteFlashDuration = 0;
+  private vignetteFlashColor = 0xffffff;
+  private dustParticles: { sprite: Graphics; vx: number; vy: number; life: number; maxLife: number }[] = [];
 
   // End-screen overlay (gameover or win)
   private overlayContainer: Container | null = null;
@@ -592,6 +599,10 @@ export class Game {
     this.screenShake.update(dtMS);
     this.world.x += this.screenShake.offsetX;
     this.world.y += this.screenShake.offsetY;
+
+    // Jumper VFX updates
+    this.updateDustParticles(dtMS);
+    this.updateVignetteFlash(dtMS);
 
     // Update shade visual position (follows world camera)
     if (this.shadeVisual) {
@@ -1277,6 +1288,7 @@ export class Game {
       s.destroy();
     });
     this.jumperDripSprites = [];
+    this.clearDustParticles();
 
     if (this.whisperer) {
       this.whisperer.destroy();
@@ -1412,8 +1424,18 @@ export class Game {
     this.player.startCaughtSequence();
     audioManager.stopAllMonsterVocals();
     audioManager.stopAllBlobs();
+    // Stop all jumper audio loops and pending timeouts
+    for (const j of this.jumpers) {
+      j.stopCrawlSound();
+      j.cancelAttackLunge();
+    }
     audioManager.playOneShot("death_thud");
     this.screenShake.trigger(800, 20);
+    this.clearDustParticles();
+    if (this.vignetteFlashGraphics) {
+      this.vignetteFlashGraphics.clear();
+      this.vignetteFlashDuration = 0;
+    }
 
     // Cancel any pending TTS calls
     for (const [, ctrl] of this.armedRadioAborts) {
@@ -2095,6 +2117,14 @@ export class Game {
       this.vignette = null;
     }
 
+    // Clean up jumper VFX
+    if (this.vignetteFlashGraphics) {
+      this.app.stage.removeChild(this.vignetteFlashGraphics);
+      this.vignetteFlashGraphics.destroy();
+      this.vignetteFlashGraphics = null;
+      this.vignetteFlashDuration = 0;
+    }
+
     // Clean up heartbeat
     this.heartbeat.destroy();
 
@@ -2141,6 +2171,9 @@ export class Game {
 
     // Clean up input event listeners
     this.input.destroy();
+
+    // Clean up dust particles (world children, before world destroy)
+    this.clearDustParticles();
 
     // Destroy world and all children (room, player, monster, pickups)
     this.app.stage.removeChild(this.world);
@@ -2618,6 +2651,113 @@ export class Game {
 
   // ── Jumper system ──
 
+  // ── Jumper VFX ──
+
+  private handleJumperVfx(event: JumperVfxEvent, jumper: Jumper): void {
+    // Scale intensity by distance from player
+    const dist = Math.abs(jumper.container.x - this.player.x);
+    const scale = dist < 500 ? 1 : dist > 1500 ? 0 : 1 - (dist - 500) / 1000;
+    if (scale <= 0) return;
+
+    switch (event) {
+      case "emerge":
+        this.screenShake.trigger(200, Math.round(6 * scale));
+        this.triggerVignetteFlash(0xffffff, 0.4 * scale, 100);
+        this.spawnDustParticles(jumper.container.x, jumper.container.y);
+        this.hud.showSubtitle("[The vent shudders]", 2000);
+        break;
+      case "attack_lunge":
+        this.screenShake.trigger(400, Math.round(12 * scale));
+        this.triggerVignetteFlash(0xff3030, 0.85 * scale, 300);
+        this.hud.showSubtitle("[Creature shrieks]", 1500);
+        break;
+      case "retreat":
+        this.screenShake.trigger(100, Math.round(3 * scale));
+        this.hud.showSubtitle("[Creature retreats]", 1500);
+        break;
+    }
+  }
+
+  private triggerVignetteFlash(color: number, alpha: number, durationMs: number): void {
+    if (!this.vignetteFlashGraphics) {
+      this.vignetteFlashGraphics = new Graphics();
+      this.vignetteFlashGraphics.zIndex = 149; // Just below vignette (150)
+      this.app.stage.addChild(this.vignetteFlashGraphics);
+    }
+    this.vignetteFlashColor = color;
+    this.vignetteFlashTimer = 0;
+    this.vignetteFlashDuration = durationMs;
+
+    const g = this.vignetteFlashGraphics;
+    g.clear();
+    g.rect(0, 0, this.app.screen.width, this.app.screen.height);
+    g.fill({ color, alpha });
+    g.alpha = 1;
+  }
+
+  private updateVignetteFlash(dtMS: number): void {
+    if (!this.vignetteFlashGraphics || this.vignetteFlashDuration <= 0) return;
+
+    this.vignetteFlashTimer += dtMS;
+    const t = Math.min(1, this.vignetteFlashTimer / this.vignetteFlashDuration);
+    this.vignetteFlashGraphics.alpha = 1 - t;
+
+    if (t >= 1) {
+      this.vignetteFlashGraphics.clear();
+      this.vignetteFlashDuration = 0;
+    }
+  }
+
+  private spawnDustParticles(x: number, y: number): void {
+    const count = 8 + Math.floor(Math.random() * 5); // 8-12 particles
+    for (let i = 0; i < count; i++) {
+      const g = new Graphics();
+      const radius = 3 + Math.random() * 3;
+      g.circle(0, 0, radius);
+      g.fill({ color: 0x8a7a6a, alpha: 0.7 });
+      g.x = x + (Math.random() - 0.5) * 40;
+      g.y = y;
+      g.zIndex = 25;
+      this.world.addChild(g);
+
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 50 + Math.random() * 100;
+      this.dustParticles.push({
+        sprite: g,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 80, // Upward bias
+        life: 0,
+        maxLife: 800,
+      });
+    }
+  }
+
+  private updateDustParticles(dtMS: number): void {
+    const dtSec = dtMS / 1000;
+    for (let i = this.dustParticles.length - 1; i >= 0; i--) {
+      const p = this.dustParticles[i];
+      p.life += dtMS;
+      p.vy += 200 * dtSec; // Gravity
+      p.sprite.x += p.vx * dtSec;
+      p.sprite.y += p.vy * dtSec;
+      p.sprite.alpha = 0.7 * (1 - p.life / p.maxLife);
+
+      if (p.life >= p.maxLife) {
+        this.world.removeChild(p.sprite);
+        p.sprite.destroy();
+        this.dustParticles.splice(i, 1);
+      }
+    }
+  }
+
+  private clearDustParticles(): void {
+    for (const p of this.dustParticles) {
+      this.world.removeChild(p.sprite);
+      p.sprite.destroy();
+    }
+    this.dustParticles = [];
+  }
+
   private createJumpers(): void {
     const def = this.rooms.currentDef;
     if (!def.jumperHotspots) return;
@@ -2665,6 +2805,11 @@ export class Game {
         hotspot, jumperFloorY, this.manifest, this.world,
         false, isFloorVent ? dripSprite : undefined,
       );
+      if (isFloorVent) {
+        jumper.onVfxEvent = (event: JumperVfxEvent, j: Jumper) => {
+          this.handleJumperVfx(event, j);
+        };
+      }
       this.jumpers.push(jumper);
     }
   }

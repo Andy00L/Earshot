@@ -37,7 +37,12 @@ export type SfxId =
   | "monster_dash_screech"
   | "jumper_vent_creak"
   | "jumper_peek_breath"
-  | "jumper_fakeout_hiss";
+  | "jumper_fakeout_hiss"
+  | "floor_jumper_emerge"
+  | "floor_jumper_attack_charge"
+  | "floor_jumper_attack_lunge"
+  | "floor_jumper_crawl"
+  | "floor_jumper_retreat";
 
 export type RadioVoiceId =
   | "radio_intro"
@@ -357,6 +362,48 @@ export const AUDIO_CATALOG: Record<AudioId, AudioAsset> = {
     durationSec: 1.2,
     loop: false,
     volume: 0.7,
+  },
+
+  // FLOOR JUMPER SFX (Sound Effects API)
+  floor_jumper_emerge: {
+    id: "floor_jumper_emerge",
+    category: "sfx",
+    prompt: "Metal vent grate cracking and warping, sudden breath inhale from a wet creature throat, debris falling, claws scraping rusted metal. Building tension, no music. Horror game sound.",
+    durationSec: 2.0,
+    loop: false,
+    volume: 0.85,
+  },
+  floor_jumper_attack_charge: {
+    id: "floor_jumper_attack_charge",
+    category: "sfx",
+    prompt: "Low demonic growl building, claws clicking rapidly on a concrete floor, raspy hyperventilation. Tension before a strike. Horror game.",
+    durationSec: 1.0,
+    loop: false,
+    volume: 0.7,
+  },
+  floor_jumper_attack_lunge: {
+    id: "floor_jumper_attack_lunge",
+    category: "sfx",
+    prompt: "Sudden visceral shriek, bone snapping, lunge whoosh, wet impact thud. Jumpscare moment. Horror game.",
+    durationSec: 1.2,
+    loop: false,
+    volume: 0.9,
+  },
+  floor_jumper_crawl: {
+    id: "floor_jumper_crawl",
+    category: "sfx",
+    prompt: "Bones scraping concrete, claws tapping rhythmically, faint raspy breathing. Slow creature movement. No music. Loopable seamlessly.",
+    durationSec: 3.0,
+    loop: true,
+    volume: 0.6,
+  },
+  floor_jumper_retreat: {
+    id: "floor_jumper_retreat",
+    category: "sfx",
+    prompt: "Creature gurgling backwards, metal vent grate clattering, dragging body sound, fading raspy breath. Withdrawal back into a wall vent. Horror game.",
+    durationSec: 1.5,
+    loop: false,
+    volume: 0.65,
   },
 
   // RADIO OPERATOR VOICE (TTS)

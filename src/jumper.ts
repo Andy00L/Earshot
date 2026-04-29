@@ -124,10 +124,22 @@ const FLOOR_REVERSE_PLAYBACK_STATES: JumperState[] = ["retreating"];
 
 const FRAMES_PER_STATE = 6;
 
+// Floor jumper audio cooldowns (ms)
+const FLOOR_EMERGE_AUDIO_COOLDOWN_MS = 6000;
+const FLOOR_ATTACK_AUDIO_COOLDOWN_MS = 4000;
+const FLOOR_RETREAT_AUDIO_COOLDOWN_MS = 5000;
+
+// Distance-based volume constants (px)
+const AUDIO_FULL_VOLUME_DIST = 500;
+const AUDIO_MUTE_DIST = 1500;
+
+export type JumperVfxEvent = "emerge" | "attack_lunge" | "retreat";
+
 export class Jumper {
   public container: Container;
   public state: JumperState = "dormant";
   public readonly isUpperFloor: boolean;
+  public onVfxEvent: ((event: JumperVfxEvent, jumper: Jumper) => void) | null = null;
 
   private hotspot: JumperHotspot;
   private sprite: Sprite;
@@ -146,6 +158,10 @@ export class Jumper {
   private grateBottomY = 0;
   private grateTopY = 0;
   private dripSprite: Sprite | undefined;
+  private crawlSoundPlaying = false;
+  private attackLungeTimeout: ReturnType<typeof setTimeout> | null = null;
+  private soundCooldowns: Map<string, number> = new Map();
+  private lastPlayerX = 0;
 
   // dripSprite is an optional non-owned reference. The Jumper toggles
   // its visibility but does NOT destroy it. Cleanup is handled by
@@ -209,9 +225,16 @@ export class Jumper {
   update(dtMS: number, playerX: number, playerY: number, playerCrouched: boolean, playerOnUpper = false): void {
     if (this.despawned) return;
 
+    this.lastPlayerX = playerX;
     this.stateTimer += dtMS;
     this.advanceFrame(dtMS);
     this.updateVisibility(playerX);
+
+    // Update crawl loop volume based on distance
+    if (this.crawlSoundPlaying && this.ventPosition === "floor") {
+      const vol = this.distanceVolume(playerX);
+      audioManager.setVolume("floor_jumper_crawl" as AudioId, vol);
+    }
 
     switch (this.state) {
       case "dormant":
@@ -267,6 +290,8 @@ export class Jumper {
   }
 
   destroy(): void {
+    this.stopCrawlSound();
+    this.cancelAttackLunge();
     this.container.parent?.removeChild(this.container);
     this.container.destroy({ children: true });
   }
@@ -323,26 +348,53 @@ export class Jumper {
         this.playAudio("monster_attack_lunge");
         break;
       case "emerging":
-        this.playAudio("jumper_vent_creak");
+        if (this.ventPosition === "floor") {
+          this.playFloorAudio("floor_jumper_emerge", FLOOR_EMERGE_AUDIO_COOLDOWN_MS);
+          this.onVfxEvent?.("emerge", this);
+        } else {
+          this.playAudio("jumper_vent_creak");
+        }
         // Top anchor on emerge frames: position at vent top edge.
         // Creature extends downward via frame progression.
         this.container.y = this.grateTopY;
         this.container.alpha = 1;
         break;
       case "getting_up":
-        this.playAudio("jumper_peek_breath");
+        // Silence. The emerge sound's tail covers this transition.
         this.container.y = this.floorY;
         break;
       case "crawling":
-        this.playAudio("monster_alert_growl");
+        if (this.ventPosition === "floor") {
+          this.startCrawlSound();
+        } else {
+          this.playAudio("monster_alert_growl");
+        }
         break;
       case "attacking":
-        this.playAudio("monster_charge_roar");
+        if (this.ventPosition === "floor") {
+          this.playFloorAudio("floor_jumper_attack_charge", FLOOR_ATTACK_AUDIO_COOLDOWN_MS);
+          this.attackLungeTimeout = setTimeout(() => {
+            this.attackLungeTimeout = null;
+            if (this.state === "attacking") {
+              this.playFloorAudio("floor_jumper_attack_lunge", FLOOR_ATTACK_AUDIO_COOLDOWN_MS);
+              this.onVfxEvent?.("attack_lunge", this);
+            }
+          }, 600);
+        } else {
+          this.playAudio("monster_charge_roar");
+        }
         this.container.y = this.floorY;
         break;
       case "retreating":
+        if (this.ventPosition === "floor") {
+          this.playFloorAudio("floor_jumper_retreat", FLOOR_RETREAT_AUDIO_COOLDOWN_MS);
+          this.stopCrawlSound();
+          this.onVfxEvent?.("retreat", this);
+        }
         break;
       case "dormant":
+        this.stopCrawlSound();
+        this.cancelAttackLunge();
         if (this.ventPosition === "floor") {
           this.container.y = this.grateBottomY;
           this.container.alpha = 0;
@@ -683,5 +735,47 @@ export class Jumper {
     if (audioManager.has(id)) {
       audioManager.playOneShot(id);
     }
+  }
+
+  /** Play a floor-jumper sound with per-sound cooldown and distance-based volume. */
+  private playFloorAudio(id: AudioId, cooldownMs: number): void {
+    const now = performance.now();
+    const last = this.soundCooldowns.get(id) ?? 0;
+    if (now - last < cooldownMs) return;
+    this.soundCooldowns.set(id, now);
+
+    const vol = this.distanceVolume(this.lastPlayerX);
+    if (vol <= 0) return;
+    audioManager.playOneShot(id, vol);
+  }
+
+  private startCrawlSound(): void {
+    if (this.crawlSoundPlaying) return;
+    const vol = this.distanceVolume(this.lastPlayerX);
+    if (vol <= 0) return;
+    audioManager.setVolume("floor_jumper_crawl" as AudioId, vol);
+    audioManager.loop("floor_jumper_crawl" as AudioId);
+    this.crawlSoundPlaying = true;
+  }
+
+  stopCrawlSound(): void {
+    if (!this.crawlSoundPlaying) return;
+    audioManager.stop("floor_jumper_crawl" as AudioId);
+    this.crawlSoundPlaying = false;
+  }
+
+  cancelAttackLunge(): void {
+    if (this.attackLungeTimeout !== null) {
+      clearTimeout(this.attackLungeTimeout);
+      this.attackLungeTimeout = null;
+    }
+  }
+
+  /** Compute volume multiplier 0-1 based on distance to player. */
+  private distanceVolume(playerX: number): number {
+    const dist = Math.abs(this.container.x - playerX);
+    if (dist < AUDIO_FULL_VOLUME_DIST) return 1;
+    if (dist > AUDIO_MUTE_DIST) return 0;
+    return 1 - (dist - AUDIO_FULL_VOLUME_DIST) / (AUDIO_MUTE_DIST - AUDIO_FULL_VOLUME_DIST);
   }
 }
