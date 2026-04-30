@@ -106,3 +106,10 @@ docs/fixes/
 *.bak
 *.tmp
 *.orig
+
+# Hackathon working notes
+docs/audits/
+docs/diagnostic/
+docs/fixes/
+docs/journal/
+CHANGELOG.md
