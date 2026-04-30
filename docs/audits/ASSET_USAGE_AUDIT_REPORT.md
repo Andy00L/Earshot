@@ -1,3 +1,5 @@
+> This audit was generated on 2026-04-26. Many sprite usages and audio catalog entries have changed since (41 hotfixes shipped after this date). Treat as historical context only.
+
 # Earshot Asset Usage Audit
 
 Date: 2026-04-26

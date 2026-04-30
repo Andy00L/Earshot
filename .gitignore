@@ -97,6 +97,10 @@ REFERENCE_PREMIUM_UI.md
 # --- Personal docs that are not part of the public submission ---
 docs/CATCH_DIAGNOSTIC_RUN.md
 
+# --- Hackathon working notes (not for public repo) ---
+docs/diagnostic/
+docs/fixes/
+
 # --- Project-specific outputs ---
 # If asset generation creates intermediate files, add patterns here.
 *.bak

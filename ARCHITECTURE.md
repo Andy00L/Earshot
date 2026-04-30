@@ -4,7 +4,7 @@
 
 ## System Overview
 
-Earshot is a browser-based 2D horror game with 35 TypeScript source files, 4 Python pipeline scripts, 1 TypeScript pipeline script, and 1 HTML entry point. The game runs on Pixi.js for rendering and Howler.js for audio. The player's real microphone feeds into a suspicion system that drives a 6-state monster AI.
+Earshot is a browser-based 2D horror game with 36 TypeScript source files, 4 Python pipeline scripts, 1 TypeScript pipeline script, and 1 HTML entry point. The game runs on Pixi.js for rendering and Howler.js for audio. The player's real microphone feeds through a GainNode (modulated by movement state) into a suspicion system that drives a 6-state monster AI.
 
 ```mermaid
 graph TD
@@ -14,7 +14,7 @@ graph TD
         MAIN --> GAME[game.ts<br>Central orchestrator]
 
         subgraph "Game Logic"
-            GAME --> PLAYER[player.ts<br>8 animation states]
+            GAME --> PLAYER[player.ts<br>13 animation states]
             GAME --> MONSTER[monster.ts<br>6-state AI FSM]
             GAME --> JUMPER[jumper.ts<br>Ceiling+floor ambush]
             GAME --> WHISPERER[whisperer.ts<br>Beacon drain ghost]
@@ -22,12 +22,12 @@ graph TD
             GAME --> INPUT[input.ts<br>Keyboard + edge detect]
             GAME --> PICKUP[pickup.ts<br>Keycard, breaker]
             GAME --> HIDING[hiding.ts<br>Locker, desk]
-            GAME --> CRAFTING[crafting.ts<br>Recipes + inventory]
+            GAME --> TAPE_PUZZLE[tape-puzzle.ts<br>Tape reconstruction]
         end
 
         subgraph "Audio Pipeline"
             GAME --> AUDIO[audio.ts<br>Howler wrapper]
-            AUDIO --> CATALOG[audio-catalog.ts<br>56 asset defs]
+            AUDIO --> CATALOG[audio-catalog.ts<br>86 catalog entries]
             GAME --> MIC[mic.ts<br>RMS analyser]
             MIC --> SUSPICION[suspicion.ts<br>RMS to delta/sec]
             GAME --> HEARTBEAT[heartbeat.ts<br>Procedural lub-dub]
@@ -67,7 +67,7 @@ graph TD
         SLICE --> ASSETS_DIR[assets/<br>PNGs + atlas.json]
         TTS -->|HTTPS POST| PROXY[api/tts.ts<br>Vercel serverless]
     PROXY -->|inject API key| ELEVEN
-    GEN[generate-audio.ts] -->|ElevenLabs API| AUDIO_DIR[assets/audio/<br>56 MP3s]
+    GEN[generate-audio.ts] -->|ElevenLabs API| AUDIO_DIR[assets/audio/<br>86 MP3s]
     end
 ```
 
@@ -89,7 +89,7 @@ Eleven labs/
     types.ts               GameState, RoomDefinition, MonsterState, etc.
     assets.ts              Manifest loader, texture registry
     input.ts               Key state tracking, edge detection
-    player.ts              Sprite, 8 states, movement physics
+    player.ts              Sprite, 13 states, movement physics
     monster.ts             AI FSM, suspicion tracking, lure mechanics
     jumper.ts              Ceiling and floor ambush predator (10-state, per-variant frame prefix maps to avoid baked-vent artifacts on floor)
     whisperer.ts           Psychological drain ghost (4-state: spawning, idle, fading, despawned)
@@ -97,15 +97,16 @@ Eleven labs/
     room.ts                Background sprite container
     pickup.ts              Collectable item behavior
     hiding.ts              HidingSpot proximity and state
-    crafting.ts            Crafting recipes and inventory management
-    workbench-menu.ts      HTML overlay for crafting UI
+    tape-puzzle.ts         Tape reconstruction puzzle (click-to-place reorder UI)
+    crafting.ts            (dormant) Crafting recipes, removed in Hotfix Q
+    workbench-menu.ts      (dormant) HTML overlay for crafting UI
     projectile.ts          Throwable item physics
     shade.ts               Death shade (inventory ghost)
     flare-effect.ts        Flare projectile with light radius
     smokebomb-effect.ts    Smoke bomb area effect
     decoy-effect.ts        Decoy radio broadcast effect
     audio.ts               AudioManager singleton (Howler wrapper)
-    audio-catalog.ts       AUDIO_CATALOG constant (60 entries)
+    audio-catalog.ts       AUDIO_CATALOG constant (86 entries)
     mic.ts                 MicAnalyser singleton (Web Audio)
     suspicion.ts           rmsToSuspicionPerSec(), suspicionDeltaForFrame()
     tts.ts                 synthesizeTTS() (ElevenLabs POST)
@@ -127,18 +128,17 @@ Eleven labs/
     requirements.txt       Pillow, numpy, scipy
   assets/
     atlas.json             Generated sprite manifest
-    audio/                 56 MP3 files
+    audio/                 86 MP3 files
     player/                49 PNGs
     monster/               27 PNGs
     props/                 12 PNGs
     *.png                  Room backgrounds, title, gameover
     preview.html           Generated QA page for sprites
   docs/
-    DAY2_GAMEPLAY.md       Gameplay skeleton dev journal
-    DAY3_AUDIO.md          Audio integration dev journal
-    DAY4_HIDING_AND_PROPS.md  Hiding + props dev journal
-    DAY4_RADIO_BAIT.md     Radio bait dev journal
-    DAY5_POLISH.md         Polish systems dev journal
+    CHANGELOG.md           Consolidated hotfix log (41 entries)
+    fixes/                 Individual hotfix reports (deep history)
+    journal/               Day-by-day build logs (DAY2 through DAY5)
+    audits/                Asset usage audit, documentation cleanup report
   raw/                     Source art (gitignored)
 ```
 
@@ -146,7 +146,7 @@ Eleven labs/
 
 ### game.ts (Central Orchestrator)
 
-The `Game` class owns every subsystem and runs the main loop via Pixi's ticker. Phases: INTRO, PLAYING, PAUSED, DYING, GAMEOVER, WIN.
+The `Game` class owns every subsystem and runs the main loop via Pixi's ticker. Phases: INTRO, PLAYING, PAUSED, DYING, GAMEOVER, CINEMATIC, WIN.
 
 ```mermaid
 stateDiagram-v2
@@ -160,7 +160,8 @@ stateDiagram-v2
     PLAYING --> DYING : Monster catches player
     DYING --> GAMEOVER : Death cinematic
     GAMEOVER --> PLAYING : Press R (restart, no intro)
-    PLAYING --> WIN : Reach stairwell exit
+    PLAYING --> CINEMATIC : Reach stairwell exit
+    CINEMATIC --> WIN : Cinematic complete (or ESC skip)
 ```
 
 During PLAYING, each tick:
@@ -211,153 +212,55 @@ The `startLure()` method is called when a radio bait detonates. It overrides the
 
 ### player.ts (Player Character)
 
-8 animation states, each with frame lists and movement speeds defined in `ANIM_DEFS`:
+13 animation states defined in `ANIM_DEFS`. Priority order (highest first): hiding/caught (state-locked), crouch (CTRL), run (SHIFT), scared (monster nearby or beacon < 30%), walk/idle (baseline).
 
-| State | Frames | Move Speed |
-|-------|--------|------------|
-| IDLE | idle (static) | 0 |
-| WALK | walk1-4 | 2.5 px/frame |
-| RUN | run1-4 | 5.0 px/frame |
-| CROUCH_IDLE | crouch-idle1-2 | 0 |
-| CROUCH_WALK | crouch-walk1-4 | 1.2 px/frame |
-| HIDING_LOCKER | (hidden) | 0 |
-| HIDING_DESK_ENTERING | hide-desk-enter1-6 | 0 |
-| HIDING_DESK_IDLE | hide-desk-idle1-6 | 0 |
-| HIDING_DESK_EXITING | hide-desk-exit1-6 | 0 |
-| CAUGHT | caught1-3 + death frames | 0 |
+| State | Frames | Move Speed | Notes |
+|-------|--------|------------|-------|
+| IDLE | idle | 0 | |
+| WALK | walk1-4 | 3 | |
+| SCARED_IDLE | scared-idle1-2 | 0 | 2-frame breathing loop |
+| SCARED_WALK | walk1-4 | 3 | Periodic look-back interrupt every 3-4.5s |
+| RUN | run1-4 | 6 | Mic gain 3x via GainNode |
+| RUN_STOP | run-stop | 0 | 200ms deceleration after exiting RUN |
+| CROUCH_IDLE | crouch-idle1-2 | 0 | Mic gain 0.2x |
+| CROUCH_WALK | crouch-walk1-4 | 1.5 | Mic gain 0.2x |
+| HIDING_LOCKER | locker-hide | 0 | Suspicion drops to 0 |
+| HIDING_DESK_ENTERING | hide-desk-enter1-6 | 0 | loop: false, auto-transitions to IDLE |
+| HIDING_DESK_IDLE | hide-desk-idle1-6 | 0 | 4x suspicion decay |
+| HIDING_DESK_EXITING | hide-desk-exit1-6 | 0 | loop: false, auto-transitions to IDLE |
+| CAUGHT | caught1-3, dead-collapsed | 0 | loop: false |
 
-HIDING_DESK_ENTERING and HIDING_DESK_EXITING use `loop: false` with `nextState` auto-transition (ENTERING -> IDLE, EXITING -> IDLE). Input is blocked during these transitions via `hidingState.transitioning`.
-
-Movement is clamped to `[50, roomWidth - 50]`. The player's Y position is anchored to the room's `floorY` using each frame's `baselineY` value from the atlas manifest.
+Movement is clamped to `[50, roomWidth - 50]`. Y position is anchored via each frame's `baselineY` from the atlas manifest.
 
 ### rooms.ts (Room Definitions)
 
-`ROOM_DEFINITIONS` is a constant that defines all 5 rooms with their full contents:
+`ROOM_DEFINITIONS` defines all 5 rooms. Reception is the hub. The exit in Stairwell requires both keycard and active breaker.
 
-```mermaid
-graph LR
-    subgraph Reception
-        R_DOOR[Doors to Cubicles,<br>Server, Archives]
-        R_PROPS[exit-sign, flickerlight,<br>workbench]
-    end
+| Room | Size | Monsters | Key Items |
+|------|------|----------|-----------|
+| Reception | 2896x1086 | None | Tape station (workbench), lore tape 01 |
+| Cubicles | 3344x941 | Listener, Jumpers | Keycard, broken tape 01, radio. 7 foreground dividers, vent to Stairwell |
+| Server | 3344x941 | Listener, Jumpers | Breaker switch, broken tape 02, radio. Upper floor with ladder |
+| Stairwell | 3344x941 | Listener, Jumpers, Whisperer (40%) | Broken tape 03, vent to Cubicles. EXIT requires keycard + breaker |
+| Archives | 2044x769 | Whisperer (30%) | Map fragment, whisper trapdoor. Beacon drains 1.5x faster |
 
-    subgraph Cubicles
-        C_DOOR_L[Door to Reception<br>press_e]
-        C_DOOR_R[Door to Server<br>press_e]
-        C_ITEMS[Keycard pickup]
-        C_HIDE[2 desks, 1 locker]
-        C_RADIO[Radio on table]
-        C_FG[7 foreground dividers<br>maze occlusion]
-        C_VENT[Vent to Stairwell]
-    end
+Each `RoomDefinition` contains: `bg`, `width/height`, `doors[]` (with requirements: press_e, keycard, breaker_on), `pickups[]`, `hidingSpots[]`, `decorativeProps[]`, `foregroundProps[]`, `radioPickups[]`, and optional vertical traversal fields for Server's upper floor.
 
-    subgraph Server
-        S_DOOR_L[Door to Cubicles<br>press_e]
-        S_DOOR_R[Door to Stairwell<br>breaker_on]
-        S_ITEMS[Breaker switch]
-        S_HIDE[2 lockers]
-        S_RADIO[Radio on table]
-        S_UPPER[Upper floor<br>ladder x=1400]
-    end
+#### Rendering layers
 
-    subgraph Stairwell
-        ST_DOOR_L[Door to Server<br>press_e]
-        ST_EXIT[Exit door<br>requires keycard]
-        ST_HIDE[1 desk]
-        ST_VENT[Vent to Cubicles]
-        ST_ALL[Listener+Jumper+<br>Whisperer 40%]
-    end
-
-    subgraph Archives
-        A_DOOR[Door to Reception<br>press_e]
-        A_ITEMS[Battery, map fragment,<br>lore tapes 04+05]
-        A_HIDE[1 desk]
-        A_WHISPERER[Whisperer 30%]
-        A_DRAIN[Beacon drains 1.5x]
-    end
-
-    Reception --> Cubicles
-    Reception --> Server
-    Reception --> Archives
-    Cubicles --> Server
-    Server --> Stairwell
-    Cubicles -.->|vent| Stairwell
-```
-
-Each `RoomDefinition` contains:
-- `bg`: background texture name
-- `width`, `height`: room dimensions in pixels
-- `monsterStart`: initial monster X position (null for reception)
-- `monsterPatrolMin`, `monsterPatrolMax`: patrol bounds
-- `doors[]`: position, target room, requirement (none, press_e, keycard, breaker_on)
-- `pickups[]`: item definitions
-- `hidingSpots[]`: locker/desk definitions with position and trigger width
-- `decorativeProps[]`: visual-only props (zIndex 0, rendered in room container)
-- `foregroundProps[]`: props rendered ABOVE the player (zIndex 80 in world container). Used by Cubicles for maze dividers
-- `radioPickups[]`: radio item definitions
-- `upperBg`, `upperFloorY`, `upperFloorXMin`, `upperFloorXMax`, `ladders[]`: vertical traversal (Server room only). Player enters CLIMBING state via W/S near ladder x. Upper-bg is a Sprite positioned at `upperFloorXMin`; the catwalk walking surface is a TilingSprite of `traversal:catwalk` tiled across the upper floor width
-- `whispererSpawnChance`: per-room override of Whisperer spawn probability (default 0.30, Stairwell uses 0.40)
-
-#### Rendering layers (world container, sortableChildren=true)
-
-| zIndex | Content |
-|--------|---------|
-| 0 | Room background, decorative props, door sprites |
-| 5 | Upper floor background (Server) |
-| 10 | Catwalk surface strip (TilingSprite, Server upper floor) |
-| 15 | Jumper container, peeking states (dormant, peeking) |
-| 20 | dripSprite (wall vent grate overlay) |
-| 30 | Ladder sprites |
-| 50 | Player |
-| 55 | Guidance arrow, hatch sprite (above player at ladder top) |
-| 80 | Foreground props (cubicle dividers) |
-| 90 | Jumper container, active states (fake_attacking, emerging, getting_up, crawling, attacking, retreating) |
-
-#### Stage-level layers (app.stage, sortableChildren=true)
-
-| zIndex | Content |
-|--------|---------|
-| 100 | Flashlight canvas overlay |
-| 150 | Vignette overlay |
-| 5000 | HUD (suspicion meter, sprite/text prompts) |
-| 7000 | Intro panel container (3 panels with click-to-continue indicator, back button on panels 2-3, TTS voiceover via Adam voice) |
-| 9500 | Loading screen (HTML, removed after boot) |
-| 10000 | Fade transition overlay (temporary, during room changes) |
+World container uses `sortableChildren=true`. Key layers: room background (0), jumper peeking (15), player (50), guidance arrow (55), foreground props (80), jumper active states (90). Stage-level: flashlight (100), vignette (150), HUD (5000), intro panels (7000), fade overlay (10000).
 
 ### audio.ts (AudioManager)
 
-The `AudioManager` is a singleton (`audioManager`) that wraps Howler.js. It survives game restarts, preventing audio interruption on death/restart.
-
-```mermaid
-sequenceDiagram
-    participant Game
-    participant AM as AudioManager
-    participant Howler
-
-    Game->>AM: loadAll(onProgress)
-    AM->>Howler: new Howl() for each catalog entry
-    Note over AM: Loaded flag persists across restarts
-
-    Game->>AM: crossfadeAmbient("cubicles_ambient")
-    AM->>Howler: Fade out current (800ms)
-    AM->>Howler: Play + fade in new (800ms)
-
-    Game->>AM: playOneShot("door_open_creak")
-    AM->>Howler: Play once
-
-    Game->>AM: loadAndPlayBlob("tts_123", blobUrl)
-    AM->>Howler: new Howl({ src: blobUrl })
-    AM->>Howler: Play
-```
-
-Audio paths follow the pattern `/audio/{id}.mp3` where `id` matches the key in `AUDIO_CATALOG`.
+Singleton (`audioManager`) wrapping Howler.js. Persists across game restarts to avoid re-loading 86 audio files. Key methods: `crossfadeAmbient()` (800ms crossfade between room tracks), `playOneShot()` (fire-and-forget SFX), `loadAndPlayBlob()` (runtime TTS playback). Audio paths: `/audio/{id}.mp3` matching keys in `AUDIO_CATALOG`.
 
 ### mic.ts + suspicion.ts (Microphone Pipeline)
 
 ```mermaid
 flowchart TD
     MIC_HW[Browser Microphone] -->|getUserMedia| STREAM[MediaStream]
-    STREAM --> ANALYSER[AnalyserNode<br>FFT 2048, smoothing 0]
+    STREAM --> GAIN[GainNode<br>RUN=3.0 / WALK=1.0 / CROUCH=0.2]
+    GAIN --> ANALYSER[AnalyserNode<br>FFT 2048, smoothing 0]
     ANALYSER -->|getFloatTimeDomainData| PCM[PCM Float32Array]
     PCM --> RMS[RMS Calculation<br>sqrt of mean squared]
     RMS --> EMA[EMA Smoothing<br>alpha = 0.2]
@@ -366,12 +269,9 @@ flowchart TD
     DELTA --> MONSTER_SUSP[Monster.addSuspicion]
 ```
 
-The `MicAnalyser` connects to Howler's shared AudioContext (`Howler.ctx`) so there is only one audio context in the page. Microphone constraints disable all automatic processing (AGC, echo cancellation, noise suppression) to get raw RMS values.
+The `MicAnalyser` connects to Howler's shared AudioContext (`Howler.ctx`). A GainNode inserted between the MediaStreamSource and AnalyserNode is modulated per frame by game.ts based on player movement state: 3.0 when running (SHIFT), 0.2 when crouching (CTRL), 1.0 otherwise. Microphone constraints disable AGC, echo cancellation, and noise suppression.
 
-The suspicion curve in `suspicion.ts` was calibrated against observed RMS values:
-- Observed silence/idle: 0.0008 to 0.0021
-- Silence floor set at 0.01125 (calibration v2, +50% from 0.0075, above laptop mic idle noise)
-- Saturation at 96/sec (calibration v2, 0.8x from 120, more forgiving overall)
+Silence floor: 0.01125 RMS. Saturation: 96/sec.
 
 ### tts.ts (ElevenLabs Integration)
 
@@ -391,31 +291,9 @@ The API key never reaches the client bundle. It stays server-side in the Vercel 
 
 ### minimap.ts (Parchment Minimap)
 
-The `Minimap` class renders a 5-room hub-and-spokes layout inside a parchment frame in the top-right corner of the HUD. It uses three atlas sprites from `assets/ui/`:
+Renders a 5-room hub-and-spokes layout in the top-right HUD corner using Pixi Graphics primitives. Hidden until the player picks up the map fragment in Archives (fades in over 600ms). Room tiles are tinted white (visited) or grey (unvisited). A pulsing dot marks the current room. Completing tape 1 enables threat markers (colored dots on rooms with monsters).
 
-- `minimap-frame` (834x645 source, displayed at 240x180): parchment background with golden corners.
-- `minimap-room-tile` (226x154 source, displayed at 36x26): one per room, tinted white (visited) or 0x666666 at 0.45 alpha (unvisited).
-- `minimap-player-dot` (52x49 source, displayed at 14x14): pulsing white dot centered on the current room tile. Oscillates scale 1.0 to 1.15 over 1200ms via sin wave.
-
-Room positions are normalized within the frame's inner area (directional insets measured per-edge from `minimap-frame.png` alpha, see `FRAME_INSET_*_PCT` constants in `src/minimap.ts`):
-
-| Room | Position | Role |
-|------|----------|------|
-| Stairwell | (0.50, 0.18) | Top center |
-| Cubicles | (0.20, 0.50) | Middle left |
-| Server | (0.50, 0.50) | Hub (center) |
-| Archives | (0.80, 0.50) | Middle right |
-| Reception | (0.50, 0.85) | Bottom center |
-
-Connection lines between adjacent rooms are drawn once at construction using Pixi Graphics (2px stroke, color 0x88684a). The vent shortcut (Cubicles to Stairwell) is not drawn.
-
-Visibility is gated by `GameState.hasMapFragment`. The minimap fades in over 600ms when the Map Fragment is picked up in Archives. Map fragment pickup triggers TTS narration via the Phase 7 lore tape pipeline (`tape_map_fragment` catalog entry, Adam voice, subtitle computed from Howl duration + 500ms tail).
-
-**Map fragment lifecycle.** The map fragment is classified as a quest item, distinct from inventory materials. It persists through death by design (Phase 9D Issue 2, decision A). The minimap, gated by `hasMapFragment`, remains visible across deaths. Death costs time and inventory, but not knowledge.
-
-**Visited room persistence.** The minimap's `visitedRooms` set persists across deaths and only resets on full game restart (Phase 9D Issue 4, decision A). On full game restart (new Game instance), all state resets.
-
-Visited rooms are tracked via `Set<RoomId>`, updated every frame by `onRoomEnter()` (called from `HUD.updateMinimap()`). This tracks room visits even before the minimap becomes visible, so when the player picks up the map fragment, all previously visited rooms are already marked. Server upper floor does not affect the minimap; the player dot stays on the Server tile regardless of floor.
+Both `hasMapFragment` and `visitedRooms` persist through death. The map fragment is a quest item, not lost on death. Visited rooms reset only on full game restart.
 
 ### flashlight.ts + vignette.ts (Atmosphere)
 
@@ -444,71 +322,11 @@ Synthesizes a lub-dub heartbeat at runtime using two Web Audio oscillators (60Hz
 
 ## Data Flow: Full Game Tick
 
-```mermaid
-sequenceDiagram
-    participant Ticker as Pixi Ticker
-    participant Game
-    participant Input
-    participant Player
-    participant Mic as MicAnalyser
-    participant Susp as suspicion.ts
-    participant Monster
-    participant HUD
-    participant Effects as Flashlight/Vignette/Shake
-
-    Ticker->>Game: tick(delta)
-    Game->>Input: read key states
-    Game->>Player: update(dt, input)
-    Game->>Mic: sample()
-    Mic-->>Game: smoothedRMS
-    Game->>Susp: suspicionDeltaForFrame(rms, dtMS)
-    Susp-->>Game: delta
-    Game->>Monster: addSuspicion(delta)
-    Game->>Monster: update(dt, dtMS)
-    Monster-->>Game: onStateChange callback
-    Game->>HUD: updateSuspicionMeter(suspicion)
-    Game->>Effects: update positions and intensities
-    Game->>Game: check doors, pickups, hiding, win/death
-    Game->>Input: endFrame()
-```
+Each PLAYING tick: read input, update player (with scared flag), set mic GainNode based on movement state, sample mic RMS, compute suspicion delta, update monster AI, update HUD/flashlight/vignette/shake/heartbeat, check doors/pickups/hiding/win/death, end frame.
 
 ## Data Flow: Radio Bait Lifecycle
 
-```mermaid
-sequenceDiagram
-    participant P as Player
-    participant G as Game
-    participant RP as RadioPopup
-    participant TTS as tts.ts
-    participant API as ElevenLabs
-    participant AM as AudioManager
-    participant M as Monster
-
-    P->>G: Press E near radio
-    G->>G: Add radio to inventory
-    P->>G: Press R
-    G->>RP: show()
-    RP-->>G: { message, timerSec }
-    G->>TTS: synthesizeTTS(message)
-    TTS->>API: POST /v1/text-to-speech
-    Note over TTS: Fire-and-forget at ARM time
-    API-->>TTS: audio/mpeg stream
-    TTS-->>G: blobUrl (stored on ArmedRadio)
-
-    P->>G: Press G (throw)
-    G->>G: Create DroppedRadio at throw position
-    Note over G: Timer counts down
-
-    G->>G: Timer expires
-    alt TTS blob ready
-        G->>AM: loadAndPlayBlob(blobUrl)
-    else TTS not ready
-        G->>AM: playOneShot("static_burst")
-    end
-    G->>M: startLure(radioX, 5000ms)
-    M->>M: Force HUNT, target = radioX, +40 suspicion
-    Note over M: 5 seconds later, lure expires
-```
+Pick up a radio (E), open the popup (R), type a message, arm with a 3-5s timer. The TTS request fires at arm time (fire-and-forget). Throw (G). When the timer expires, the TTS audio plays at the throw position (or `static_burst` SFX if the API hasn't returned). The Listener is lured to the radio for 5 seconds with +40 suspicion and forced HUNT state.
 
 ## State Management
 
@@ -516,10 +334,10 @@ All game state lives in a single `GameState` object created by `createInitialGam
 
 ```typescript
 interface GameState {
-  phase: GamePhase;           // "INTRO" | "PLAYING" | "PAUSED" | "DYING" | "GAMEOVER" | "WIN"
+  phase: GamePhase;           // "INTRO" | "PLAYING" | "PAUSED" | "DYING" | "GAMEOVER" | "CINEMATIC" | "WIN"
   introPanelIndex: 0 | 1 | 2;
   currentRoom: RoomId;        // "reception" | "cubicles" | "server" | "stairwell" | "archives"
-  inventory: Set<PickupId>;   // "keycard" | "breaker_switch"
+  inventory: Set<PickupId>;   // "keycard" | "breaker_switch" | TapeId
   breakerOn: boolean;
   suspicion: number;          // 0-100
   carriedRadio: ArmedRadio | null;
@@ -527,6 +345,10 @@ interface GameState {
   spentRadios: SpentRadio[];
   isHiding: boolean;
   hidingKind: HidingSpotKind | null;
+  brokenTapesCollected: Set<TapeId>;
+  tapesReconstructed: Set<TapeId>;
+  revealMonsterPositions: boolean;
+  exitFinalChallengeActive: boolean;
   runStats: { startTime, roomsVisited, monsterEncounters };
 }
 ```
@@ -554,4 +376,4 @@ There is no global error boundary. Errors in the game loop will stop the ticker.
 
 **Python asset pipeline.** The sprite slicer uses connected-component labeling (scipy) rather than fixed grid slicing. This handles hand-drawn art where frames have varying widths and occasional detached elements (fingers, weapons).
 
-[Back to README](README.md)
+**Tape reconstruction over crafting.** The original crafting system (collect materials, combine at workbench) was removed in Hotfix Q. The workbench was repurposed as a tape reconstruction station in Hotfix T. Three broken tapes are scattered across rooms. Each tape has four audio segments that must be reordered by ear. Correct reconstruction unlocks rewards: minimap threat markers (tape 1), a deferred flag (tape 2), and a silent exit challenge (tape 3).
