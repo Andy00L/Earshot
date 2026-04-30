@@ -1,24 +1,32 @@
-A horror game where your microphone is the controller.
+**Hear them before they hear you.**
 
-# Earshot
+> ElevenHacks Hackathon. A horror game where your microphone is the controller. Whisper to live. Speak and the building wakes up.
 
-Five rooms. Three monsters. One way out. Your voice powers the flashlight, but every sound draws the creatures closer.
+[![Play](https://img.shields.io/badge/%E2%96%B6_Play-earshot.vercel.app-22c55e?style=flat)](https://earshot.vercel.app)
+![ElevenLabs](https://img.shields.io/badge/ElevenLabs-SFX_+_TTS_+_Music-f97316?style=flat)
+![Pixi.js](https://img.shields.io/badge/Pixi.js-8-7c3aed?style=flat)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6?style=flat)
+![Vite](https://img.shields.io/badge/Vite-6-646cff?style=flat)
+![Web Audio](https://img.shields.io/badge/Web_Audio-mic_driven-ea580c?style=flat)
+![Built for](https://img.shields.io/badge/Built_for-ElevenHacks-f97316?style=flat)
 
 ![Earshot](docs/demo.png)
 
-## How it works
+🎙️ You wake up in an abandoned office building. Five rooms. The lights are dying, the doors are locked, and something in the dark is listening. To get out, you need a keycard, the breaker back on, and enough nerve to reach the exit before the building takes you.
 
-Speak to see. Your mic feeds a beacon meter that drives the flashlight radius. Go silent and the light dies. Shout and the Listener starts hunting.
+🎮 Every sound matters. Whisper and your flashlight stays alive. Speak and something turns its head. Run and you wake the whole floor. The monsters don't care if they can see you. They care if they can hear you.
 
-Three monsters share the building. The Listener patrols by sound. Jumpers ambush from ceiling and floor vents. The Whisperer drains your light with eerie voice lines from ElevenLabs.
+## 👁️ The Monsters
 
-Pick up a radio, type a message, throw. ElevenLabs synthesizes your text into speech in real time, luring the Listener to the landing spot.
+Three of them share the building.
 
-Find three broken tapes scattered across the building. Bring each to the station in Reception. Reconstruct it by ear (reorder four shuffled audio fragments) to unlock map intel and a final challenge.
+The Listener hunts by sound. A 6-state AI driven entirely by your microphone input. The Whisperer won't let you past her trapdoor until you whisper a phrase she gives you, into your actual mic. The Jumpers wait in the vents (ceiling and floor) and drop when you get too close.
 
-Hold SHIFT to run. Faster, louder. Hold CTRL to crouch. Slower, quieter. Speed or stealth, pick one.
+## 🎯 What you do
 
-## Run locally
+Pick up a radio, type a message, throw. ElevenLabs turns your text into speech in real time, luring the Listener to the landing spot. Solve a breaker puzzle by ear. Reconstruct broken tape recordings at the workbench. Hide in lockers and under desks. Crouch to move silent. Run when you have to and pay the noise tax.
+
+## 🏃 Run it
 
 ```bash
 npm install
@@ -27,23 +35,27 @@ cp .env.example .env
 npm run dev
 ```
 
-Open http://localhost:5173. Allow microphone access.
+Open http://localhost:5173. Allow microphone access. For live radio TTS, run `npx vercel dev` instead.
 
-Radio bait falls back to a static SFX in dev mode. For live TTS, run `npx vercel dev` instead.
+## 🛠️ Built with
 
-## Stack
+- **[Pixi.js](https://pixijs.com/)** for 2D rendering
+- **[Howler.js](https://howlerjs.com/) + Web Audio API** for sound
+- **[ElevenLabs](https://elevenlabs.io)** for everything that speaks (Sound Effects, TTS, Music)
+- **TypeScript** and **Vite**
 
-- [Pixi.js](https://pixijs.com/) for 2D rendering
-- [Howler.js](https://howlerjs.com/) and Web Audio API for sound
-- [ElevenLabs](https://elevenlabs.io) for TTS, sound effects, and music
-
-## Docs
+## 📖 Docs
 
 - [Architecture](ARCHITECTURE.md)
 - [Changelog](docs/CHANGELOG.md)
 - [Build journal](docs/journal/)
 
-## Built for
+## 🎬 The ending
 
-Solo build for [#ElevenHacks](https://elevenhacks.com) (April 2026), the [ElevenLabs](https://elevenlabs.io) x [Zed](https://zed.dev) game jam.
-[@elevenlabsio](https://x.com/elevenlabsio) [@zeddotdev](https://x.com/zeddotdev)
+You make it to the exit. You step through the door. You think you're free.
+
+You never left.
+
+---
+
+Built solo. Five days. For the [@elevenlabsio](https://x.com/elevenlabsio) x [@zeddotdev](https://x.com/zeddotdev) hackathon. [#ElevenHacks](https://elevenhacks.com)
