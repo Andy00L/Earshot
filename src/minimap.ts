@@ -204,6 +204,28 @@ export class Minimap {
     this.retintRooms();
   }
 
+  /** Show threat markers on rooms with monsters, jumpers, or whisperers. */
+  enableThreatMarkers(): void {
+    const threatRooms: Record<RoomId, number> = {
+      reception: 0,
+      cubicles: 0xff4444,  // Listener + jumpers
+      server: 0xff4444,    // Listener + jumpers
+      stairwell: 0xff8844, // Listener + jumpers + whisperer
+      archives: 0x88cc88,  // Whisperer
+    };
+    for (const [roomId, color] of Object.entries(threatRooms) as [RoomId, number][]) {
+      if (color === 0) continue;
+      const tile = this.roomTiles.get(roomId);
+      if (!tile) continue;
+      const dot = new Graphics();
+      dot.circle(0, 0, 4);
+      dot.fill({ color, alpha: 0.9 });
+      dot.x = tile.x + 14;
+      dot.y = tile.y - 6;
+      this.container.addChild(dot);
+    }
+  }
+
   /** Reset all state. Used on full game restart. */
   reset(): void {
     this.visitedRooms.clear();

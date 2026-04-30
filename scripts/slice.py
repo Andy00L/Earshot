@@ -23,7 +23,7 @@ from PIL import Image
 # Sibling imports
 sys.path.insert(0, str(Path(__file__).parent))
 from atlas_config import ATLAS_PROFILES
-from chroma import chroma_key_hsv
+from chroma import chroma_key_hsv, chroma_key_magenta
 from detect import detect_sprites_strip, detect_sprites_grid
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -348,7 +348,11 @@ def _handle_single_chroma(
 
     if use_chroma:
         rgb = np.array(Image.open(src_path).convert("RGB"))
-        rgba = chroma_key_hsv(rgb)
+        chroma_color = profile.get("chroma_color", "green")
+        if chroma_color == "magenta":
+            rgba = chroma_key_magenta(rgb)
+        else:
+            rgba = chroma_key_hsv(rgb)
         pil = Image.fromarray(rgba)
     else:
         pil = Image.open(src_path).convert("RGBA")

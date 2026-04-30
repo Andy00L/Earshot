@@ -20,7 +20,6 @@ import {
   VentDef,
   JumperHotspot,
   MaterialId,
-  CraftedItemId,
   InventorySlotItem,
   LoreTapeId,
   isLoreTapeId,
@@ -56,16 +55,25 @@ import { RadioPopup } from "./radio-popup";
 import { synthesizeTTS } from "./tts";
 import { ScreenShake } from "./screen-shake";
 import { Heartbeat } from "./heartbeat";
+import { ImpactBass } from "./impact-bass";
+import { FrameFreeze } from "./frame-freeze";
 import { Vignette } from "./vignette";
-import { RECIPES, craft } from "./crafting";
 import { Projectile } from "./projectile";
 import { FlareEffect } from "./flare-effect";
 import { SmokeBombEffect } from "./smokebomb-effect";
 import { DecoyEffect } from "./decoy-effect";
-import { WorkbenchMenu } from "./workbench-menu";
+import { BreakerPuzzle, BreakerPuzzleResult } from "./breaker-puzzle";
+import { WhisperPuzzle, WhisperPuzzleResult } from "./whisper-puzzle";
+import { TapePuzzle, TapePuzzleResult } from "./tape-puzzle";
+import { TapeId } from "./types";
 import { ShadeVisual } from "./shade";
-import { GuidanceArrow } from "./guidance-arrow";
+import { GuidanceArrow, getArrowTarget } from "./guidance-arrow";
+import { PulseRing } from "./pulse-ring";
 import { getFrameMeta } from "./assets";
+
+// Hotfix Q: Crafting disabled. Workbench interaction removed, throwable items
+// unreachable. src/crafting.ts and src/workbench-menu.ts preserved for Hotfix T
+// (tape station repurpose). Materials remain as collectible pickups.
 
 /** Revoke any outstanding TTS blob URLs to prevent memory leaks. */
 function revokeRadioBlobs(radios: { ttsBlobUrl?: string | null }[]): void {
@@ -126,9 +134,21 @@ export class Game {
   // Radio bait system
   private beaconState: BeaconState = createBeaconState();
   private radioPopup: RadioPopup;
-  private workbenchMenu: WorkbenchMenu;
 
-  // Crafting projectile/effect systems
+  // Breaker puzzle (Hotfix R)
+  private breakerPuzzle: BreakerPuzzle;
+  private breakerPickupRef: Pickup | null = null;
+
+  // Whisper lock puzzle (Hotfix S)
+  private whisperPuzzle: WhisperPuzzle;
+  private whisperTrapSprite: Sprite | null = null;
+  private beaconDrainOverride = 1.0;
+  private beaconDrainOverrideExpiresAt = 0;
+
+  // Tape reconstruction station (Hotfix T)
+  private tapePuzzle: TapePuzzle | null = null;
+
+  // Projectile/effect arrays (unused after Hotfix Q, kept for Hotfix T)
   private projectiles: Projectile[] = [];
   private flareEffects: FlareEffect[] = [];
   private smokeBombEffects: SmokeBombEffect[] = [];
@@ -159,6 +179,8 @@ export class Game {
   // Day 5 polish systems
   private screenShake = new ScreenShake();
   private heartbeat = new Heartbeat();
+  private impactBass = new ImpactBass();
+  private frameFreeze = new FrameFreeze();
   private vignette: Vignette | null = null;
 
   // Jumper VFX state
@@ -170,6 +192,9 @@ export class Game {
 
   // End-screen overlay (gameover or win)
   private overlayContainer: Container | null = null;
+
+  // Sad ending cinematic (Hotfix U.27)
+  private cinematicAbort: AbortController | null = null;
 
   // Death fade overlay (tracked for cleanup on restart)
   private deathFadeOverlay: Graphics | null = null;
@@ -185,6 +210,12 @@ export class Game {
 
   // Guidance arrow (points player toward next objective)
   private guidanceArrow: GuidanceArrow | null = null;
+
+  // Visual affordance pulses (created per room, destroyed on room change)
+  private breakerPulse: PulseRing | null = null;
+  private trapdoorPulse: PulseRing | null = null;
+  private workbenchPulse: PulseRing | null = null;
+  private workbenchTapeRecorderSprite: Sprite | null = null;
 
   // Footstep SFX timing
   private footstepTimer = 0;
@@ -230,7 +261,17 @@ export class Game {
     this.state = createInitialGameState();
     this.state.loadedLockers = this.rollLockerJumpers();
     this.radioPopup = new RadioPopup();
-    this.workbenchMenu = new WorkbenchMenu();
+    this.breakerPuzzle = new BreakerPuzzle({
+      onResult: (result) => this.handleBreakerResult(result),
+      onAudioPlay: () => this.onBreakerAudioPlay(),
+      timerMs: 15000,
+    });
+    this.whisperPuzzle = new WhisperPuzzle({
+      onResult: (result) => this.handleWhisperResult(result),
+      attemptsAllowed: 3,
+      windowMs: 10000,
+      requiredDurationMs: 1500,
+    });
   }
 
   async start(): Promise<void> {
@@ -271,12 +312,14 @@ export class Game {
     // Create room-specific props for reception
     this.createDoors();
     this.createDecorativeProps();
+    this.createWhisperTrapSprite();
     this.createForegroundProps();
     this.createLadderAndUpperFloor();
     this.createHidingSpots();
     this.createVents();
     this.createJumpers();
     this.createRadioWorldSprites();
+    this.createPulseRings();
 
     // Lock gameplay until audio loaded and user clicks
     this.locked = true;
@@ -316,6 +359,7 @@ export class Game {
 
     // Start heartbeat (share Howler's AudioContext to avoid browser cap)
     this.heartbeat.start(Howler.ctx);
+    this.impactBass.start(Howler.ctx);
 
     // Tab visibility: pause/resume audio
     this.visibilityHandler = () => {
@@ -454,6 +498,11 @@ export class Game {
         // Death cinematic runs via runDeathCinematic(); tick just advances animation
         break;
 
+      case "CINEMATIC":
+        // Sad ending cinematic runs via runSadEndingCinematic(); tick is idle
+        if (this.input.isEscapeHeld()) this.cinematicAbort?.abort();
+        break;
+
       case "GAMEOVER":
       case "WIN":
         if (!this.locked && this.input.justPressed("KeyR")) {
@@ -476,11 +525,24 @@ export class Game {
   private handlePlayingTick(dt: number, dtMS: number): void {
     if (this.locked) return;
 
+    // Frame freeze (Hotfix P): skip gameplay updates, keep VFX alive
+    // so the impact moment reads visually (screen shake jitter, vignette
+    // flash tween, dust particle physics all continue).
+    if (this.frameFreeze.isFrozen()) {
+      this.updateCamera();
+      this.screenShake.update(dtMS);
+      this.world.x += this.screenShake.offsetX;
+      this.world.y += this.screenShake.offsetY;
+      this.updateDustParticles(dtMS);
+      this.updateVignetteFlash(dtMS);
+      return;
+    }
+
     // Ladder climbing state overrides normal player movement
     if (this.playerClimbingLadder) {
       this.handleClimbing(dt);
     } else {
-      this.player.update(dt, this.input);
+      this.player.update(dt, this.input, this.isPlayerScared());
       // Clamp player to upper floor X bounds if on upper floor
       if (this.playerFloorYOverride !== null) {
         const def = this.rooms.currentDef;
@@ -496,8 +558,30 @@ export class Game {
     }
     this.monster?.update(dt, dtMS);
 
+    // Mic gain modulation: run = 3x louder, crouch = 0.2x quieter
+    if (micAnalyser.state === "active") {
+      const ms = this.player.movementState;
+      if (ms === "RUN") {
+        micAnalyser.setGain(3.0);
+      } else if (ms === "CROUCH_WALK" || ms === "CROUCH_IDLE") {
+        micAnalyser.setGain(0.2);
+      } else {
+        micAnalyser.setGain(1.0);
+      }
+    }
+
     // Guidance arrow
     this.updateGuidanceArrow(dtMS);
+
+    // Visual affordance pulses
+    this.breakerPulse?.update(dtMS);
+    this.trapdoorPulse?.update(dtMS);
+    this.workbenchPulse?.update(dtMS);
+
+    // Positional whisper trap ambient
+    if (this.state.currentRoom === "archives" && !this.state.whisperTrapUnlocked) {
+      this.updateWhisperTrapAmbient(this.player.x);
+    }
 
     // Update Jumpers
     const playerCrouched = this.player.isCrouching();
@@ -528,8 +612,10 @@ export class Game {
       normal: RMS_THRESHOLD_NORMAL,
       shout: RMS_THRESHOLD_SHOUT,
     });
-    const drainMult = this.rooms.currentDef.beaconDrainMultiplier ?? 1.0;
-    updateBeacon(this.beaconState, band, dtMS, drainMult);
+    const roomDrain = this.rooms.currentDef.beaconDrainMultiplier ?? 1.0;
+    const tempDrain = performance.now() < this.beaconDrainOverrideExpiresAt
+      ? this.beaconDrainOverride : 1.0;
+    updateBeacon(this.beaconState, band, dtMS, roomDrain * tempDrain);
 
     if (this.monster && micAnalyser.state === "active") {
       const delta = suspicionDeltaForFrame(rms, dtMS);
@@ -564,6 +650,11 @@ export class Game {
     const slotPick = this.input.justSelectedSlot();
     if (slotPick !== -1) this.state.selectedSlot = slotPick;
 
+    // Whisper charm: use (F key)
+    if (this.input.justUsedCharm() && this.state.hasWhisperCharm) {
+      this.useWhisperCharm();
+    }
+
     // Radio: arm (R key) and throw (G key)
     if (this.input.justArmedRadio()) {
       this.armCarriedRadio();
@@ -574,14 +665,12 @@ export class Game {
       );
       if (hasArmedRadio) {
         this.throwCarriedArmedRadio();
-      } else {
-        this.throwSelectedItem();
       }
     }
     this.updateArmedRadios(dtMS);
     this.syncArmedRadioSprites();
 
-    // Update crafted-item projectiles and effects
+    // Update projectiles and effects
     this.updateProjectiles(dtMS);
     this.updateFlareEffects(dtMS);
     this.updateSmokeBombEffects(dtMS);
@@ -654,7 +743,7 @@ export class Game {
         this.beaconState.value < 70) {
       this.playTutorialT2();
     }
-    // T3 early trigger: player near workbench (within 150px)
+    // T3 early trigger: player reaches center of reception (within 150px)
     if (this.state.tutorialPlayed.t2 && !this.state.tutorialPlayed.t3 &&
         this.state.currentRoom === "reception") {
       const wb = ROOM_DEFINITIONS.reception.workbench;
@@ -690,28 +779,18 @@ export class Game {
 
   // ── Guidance arrow ──
 
-  private getArrowTarget(): { roomId: RoomId; itemX: number } | null {
-    if (this.state.hasMapFragment) return null;
-    if (!this.state.inventory.has("keycard")) {
-      return { roomId: "cubicles", itemX: 1600 };
-    }
-    if (!this.state.breakerOn) {
-      return { roomId: "server", itemX: 2600 };
-    }
-    return { roomId: "archives", itemX: 2000 };
-  }
-
   private getDoorXTowardRoom(currentRoom: RoomId, targetRoom: RoomId): number | null {
     if (currentRoom === targetRoom) return null;
 
     const def = this.rooms.currentDef;
+    // Direct neighbor
     for (const door of def.doors ?? []) {
       if (door.toRoom === targetRoom) {
         return door.fromX;
       }
     }
 
-    // Indirect: route through reception (the hub)
+    // Route through reception (the hub)
     if (currentRoom !== "reception") {
       for (const door of def.doors ?? []) {
         if (door.toRoom === "reception") {
@@ -720,17 +799,35 @@ export class Game {
       }
     }
 
+    // Multi-hop for non-adjacent rooms.
+    // Topology: archives - reception - cubicles - server - stairwell
+    if (currentRoom === "reception" && targetRoom === "stairwell") {
+      for (const door of def.doors ?? []) {
+        if (door.toRoom === "server") return door.fromX;
+      }
+    }
+    if (currentRoom === "server" && targetRoom !== "cubicles" && targetRoom !== "stairwell") {
+      for (const door of def.doors ?? []) {
+        if (door.toRoom === "cubicles") return door.fromX;
+      }
+    }
+    if (currentRoom === "stairwell" && targetRoom !== "server") {
+      for (const door of def.doors ?? []) {
+        if (door.toRoom === "server") return door.fromX;
+      }
+    }
+
     return null;
   }
 
   private computeArrowTargetX(): number | null {
-    const target = this.getArrowTarget();
+    const target = getArrowTarget(this.state);
     if (!target) return null;
 
-    if (target.roomId === this.state.currentRoom) {
-      return target.itemX;
+    if (target.room === this.state.currentRoom) {
+      return target.x;
     }
-    return this.getDoorXTowardRoom(this.state.currentRoom, target.roomId);
+    return this.getDoorXTowardRoom(this.state.currentRoom, target.room);
   }
 
   private getObjectiveRooms(): Set<RoomId> {
@@ -767,6 +864,97 @@ export class Game {
     }
 
     this.guidanceArrow.update(this.player.x, this.player.y, dtMs);
+  }
+
+  // ── Visual affordance pulses ──
+
+  private shouldShowWorkbenchPulse(): boolean {
+    for (const id of this.state.brokenTapesCollected) {
+      if (!this.state.tapesReconstructed.has(id)) return true;
+    }
+    return false;
+  }
+
+  private createPulseRings(): void {
+    this.destroyPulseRings();
+    const floorY = this.rooms.currentRoom.floorY;
+
+    if (this.state.currentRoom === "server" && !this.state.breakerOn) {
+      this.breakerPulse = new PulseRing({
+        x: 2700,
+        y: floorY - 80,
+        parent: this.world,
+        color: 0xc4a484,
+        baseRadius: 65,
+        periodMs: 2200,
+      });
+    }
+
+    if (this.state.currentRoom === "archives" && !this.state.whisperTrapUnlocked) {
+      this.trapdoorPulse = new PulseRing({
+        x: 1500,
+        y: floorY - 10,
+        parent: this.world,
+        color: 0x88b098,
+        baseRadius: 70,
+        periodMs: 2400,
+      });
+    }
+
+    if (this.state.currentRoom === "reception" && this.shouldShowWorkbenchPulse()) {
+      this.workbenchPulse = new PulseRing({
+        x: 1500,
+        y: floorY - 20,
+        parent: this.world,
+        color: 0xd4a878,
+        baseRadius: 75,
+        periodMs: 1800,
+      });
+    }
+
+    this.createWorkbenchOverlay();
+  }
+
+  private destroyPulseRings(): void {
+    this.breakerPulse?.destroy();
+    this.breakerPulse = null;
+    this.trapdoorPulse?.destroy();
+    this.trapdoorPulse = null;
+    this.workbenchPulse?.destroy();
+    this.workbenchPulse = null;
+    this.destroyWorkbenchOverlay();
+  }
+
+  private createWorkbenchOverlay(): void {
+    if (this.state.currentRoom !== "reception") return;
+    if (!this.shouldShowWorkbenchPulse()) return;
+    if (this.workbenchTapeRecorderSprite) return;
+
+    const tex = Assets.get<Texture>("puzzle-props:tape_recorder");
+    if (!tex || tex === Texture.WHITE) return;
+
+    this.workbenchTapeRecorderSprite = new Sprite(tex);
+    this.workbenchTapeRecorderSprite.anchor.set(0.5, 1.0);
+    this.workbenchTapeRecorderSprite.x = 1500;
+    this.workbenchTapeRecorderSprite.y = this.rooms.currentRoom.floorY - 50;
+    this.workbenchTapeRecorderSprite.scale.set(0.1);
+    this.workbenchTapeRecorderSprite.zIndex = 81;
+    this.world.addChild(this.workbenchTapeRecorderSprite);
+  }
+
+  private destroyWorkbenchOverlay(): void {
+    if (!this.workbenchTapeRecorderSprite) return;
+    this.workbenchTapeRecorderSprite.parent?.removeChild(this.workbenchTapeRecorderSprite);
+    this.workbenchTapeRecorderSprite.destroy();
+    this.workbenchTapeRecorderSprite = null;
+  }
+
+  private updateWorkbenchOverlay(): void {
+    if (this.state.currentRoom === "reception" && this.shouldShowWorkbenchPulse()) {
+      this.createWorkbenchOverlay();
+    } else {
+      this.destroyWorkbenchOverlay();
+    }
   }
 
   // ── Footstep SFX ──
@@ -850,13 +1038,14 @@ export class Game {
       if (!pickup.isInRange(this.player.x)) continue;
 
       if (pickup.config.togglesTo) {
-        // Toggle pickup (breaker switch)
-        pickup.setToggled();
-        if (pickup.config.id === "breaker_switch") {
-          this.state.breakerOn = true;
-          this.hud.showMessage("Power restored.");
-          audioManager.playOneShot("breaker_switch");
+        // Breaker switch: open audio-match puzzle (Hotfix R)
+        if (pickup.config.id === "breaker_switch" && !this.state.breakerOn) {
+          this.breakerPickupRef = pickup;
+          this.openBreakerPuzzle();
+          return;
         }
+        // Other toggle pickups (or breaker already on)
+        pickup.setToggled();
       } else {
         // Collect pickup
         const pickupId = pickup.config.id;
@@ -866,6 +1055,24 @@ export class Game {
           pickup.collect();
           this.state.tapesCollected.add(pickupId);
           this.playLoreTape(pickupId);
+          return;
+        }
+
+        // Broken tapes: add to tape collection (Hotfix T)
+        const isBrokenTape =
+          pickupId === "broken_tape_01" ||
+          pickupId === "broken_tape_02" ||
+          pickupId === "broken_tape_03";
+        if (isBrokenTape) {
+          // Skip if already completed (E8: persists across death)
+          if (this.state.tapesReconstructed.has(pickupId as TapeId)) {
+            pickup.collect();
+            return;
+          }
+          pickup.collect();
+          this.state.brokenTapesCollected.add(pickupId as TapeId);
+          this.hud.showMessage("Picked up broken tape.");
+          audioManager.playOneShot("keycard_pickup");
           return;
         }
 
@@ -915,9 +1122,15 @@ export class Game {
       return; // E press consumed
     }
 
-    // Check workbench
-    if (this.isNearWorkbench()) {
-      this.openWorkbench();
+    // Tape reconstruction station (Reception workbench)
+    if (this.isNearTapeStation()) {
+      this.openTapeStation();
+      return;
+    }
+
+    // Whisper trap (Archives)
+    if (this.isNearWhisperTrap()) {
+      this.openWhisperPuzzle();
       return;
     }
 
@@ -965,14 +1178,37 @@ export class Game {
       return;
     }
 
-    // Win condition: exit door in stairwell with keycard
+    // Win condition: exit door in stairwell
     if (door.isExit) {
+      // Gate: require breaker activated (Hotfix U.22)
+      if (!this.state.breakerOn) {
+        this.hud.showMessage("The exit is dark. Power must be restored.", 3000);
+        audioManager.playOneShot("door_locked_rattle");
+        return;
+      }
+      // Tape 3 reward: silent exit challenge (Hotfix T)
+      if (this.state.exitFinalChallengeActive) {
+        const rms = micAnalyser.state === "active" ? micAnalyser.smoothedRms : 0;
+        if (rms >= RMS_THRESHOLD_NORMAL) {
+          this.hud.showMessage("Too loud. Approach in silence.", 2000);
+          audioManager.playOneShot("door_locked_rattle");
+          return;
+        }
+      }
       this.triggerWin();
       return;
     }
 
     audioManager.playOneShot("door_open_creak");
     this.transitionToRoom(door.toRoom, door.toX);
+  }
+
+  // ── Scared mood ──
+
+  private isPlayerScared(): boolean {
+    // Scared when a monster is in the room or beacon is critically low
+    return this.monster !== null
+      || this.beaconState.value < this.beaconState.maxBeacon * 0.3;
   }
 
   // ── Catch detection ──
@@ -1212,6 +1448,7 @@ export class Game {
       this.createMonster();
       this.createDoors();
       this.createDecorativeProps();
+      this.createWhisperTrapSprite();
       this.createForegroundProps();
       this.createLadderAndUpperFloor();
       this.createHidingSpots();
@@ -1219,6 +1456,7 @@ export class Game {
       this.createJumpers();
       this.createRadioWorldSprites();
       this.maybeCreateShadeVisual();
+      this.createPulseRings();
 
       // Reset upper floor state on room change
       this.playerFloorYOverride = null;
@@ -1289,6 +1527,7 @@ export class Game {
     });
     this.jumperDripSprites = [];
     this.clearDustParticles();
+    this.frameFreeze.clear();
 
     if (this.whisperer) {
       this.whisperer.destroy();
@@ -1314,7 +1553,7 @@ export class Game {
     // Clean up radio sprites (armed, dropped, spent) for old room
     this.destroyRadioSprites();
 
-    // Clean up crafting projectiles and effects
+    // Clean up projectiles and effects
     this.projectiles.forEach((p) => p.destroy());
     this.projectiles = [];
     this.flareEffects.forEach((f) => f.destroy());
@@ -1329,6 +1568,15 @@ export class Game {
       this.shadeVisual.destroy();
       this.shadeVisual = null;
     }
+
+    if (this.whisperTrapSprite) {
+      this.whisperTrapSprite.parent?.removeChild(this.whisperTrapSprite);
+      this.whisperTrapSprite.destroy();
+      this.whisperTrapSprite = null;
+    }
+
+    this.destroyPulseRings();
+    this.stopWhisperTrapAmbient();
   }
 
   private createPickups(): void {
@@ -1338,6 +1586,8 @@ export class Game {
       if (!pc.togglesTo && this.state.inventory.has(pc.id)) continue;
       // Skip collected lore tapes (persist across deaths)
       if (isLoreTapeId(pc.id) && this.state.tapesCollected.has(pc.id)) continue;
+      // Skip reconstructed broken tapes (persist across deaths)
+      if (this.state.tapesReconstructed.has(pc.id as TapeId)) continue;
 
       const pickup = new Pickup(
         this.world,
@@ -1422,6 +1672,7 @@ export class Game {
       this.whisperer = null;
     }
     this.player.startCaughtSequence();
+    micAnalyser.setGain(1.0);
     audioManager.stopAllMonsterVocals();
     audioManager.stopAllBlobs();
     // Stop all jumper audio loops and pending timeouts
@@ -1429,9 +1680,12 @@ export class Game {
       j.stopCrawlSound();
       j.cancelAttackLunge();
     }
+    this.frameFreeze.clear();
     audioManager.playOneShot("death_thud");
     this.screenShake.trigger(800, 20);
     this.clearDustParticles();
+    this.destroyPulseRings();
+    this.stopWhisperTrapAmbient();
     if (this.vignetteFlashGraphics) {
       this.vignetteFlashGraphics.clear();
       this.vignetteFlashDuration = 0;
@@ -1601,6 +1855,11 @@ export class Game {
     this.state.inventorySlots = [null, null, null];
     this.state.selectedSlot = 0;
 
+    // Re-add whisper charm to slot if player still has it (persists through death)
+    if (this.state.hasWhisperCharm) {
+      this.state.inventorySlots[0] = { kind: "whisper_charm" };
+    }
+
     // Remove materials so they respawn as pickups
     this.state.inventory.delete("wire");
     this.state.inventory.delete("glass_shards");
@@ -1635,7 +1894,7 @@ export class Game {
 
     // Reset player from CAUGHT back to IDLE
     this.player.setStandingPose();
-    this.player.x = 1500; // near workbench
+    this.player.x = 1500; // center of reception
     this.player.y = this.rooms.currentRoom.floorY;
     this.player.setRoomWidth(this.rooms.currentRoom.roomWidth);
     this.updateCamera();
@@ -1645,6 +1904,7 @@ export class Game {
     this.createMonster();
     this.createDoors();
     this.createDecorativeProps();
+    this.createWhisperTrapSprite();
     this.createForegroundProps();
     this.createLadderAndUpperFloor();
     this.createHidingSpots();
@@ -1780,20 +2040,103 @@ export class Game {
 
   private async triggerWin(): Promise<void> {
     if (this.state.phase !== "PLAYING") return;
-    this.state.phase = "WIN";
-    this.clearTutorialTimers();
+    this.state.phase = "CINEMATIC";
     this.locked = true;
-
-    audioManager.playOneShot("win_chime");
+    this.clearTutorialTimers();
+    this.stopAllNarrations();
     audioManager.stopAllMonsterVocals();
+    audioManager.stopAllBlobs();
+    micAnalyser.setGain(1.0);
+    this.heartbeat.stop();
 
-    await fadeTransition(this.app.stage, this.app.ticker, () => {
-      this.buildEndScreen(null, "YOU ESCAPED\n\nPRESS R TO RESTART");
-      if (this.flashlight) this.flashlight.setVisible(false);
-      audioManager.fadeOutAmbient();
-    });
+    await this.runSadEndingCinematic();
+  }
 
+  private async runSadEndingCinematic(): Promise<void> {
+    const abort = new AbortController();
+    this.cinematicAbort = abort;
+
+    const delay = (ms: number): Promise<void> => {
+      if (abort.signal.aborted) return Promise.resolve();
+      return new Promise<void>(resolve => {
+        const id = setTimeout(resolve, ms);
+        const onAbort = (): void => { clearTimeout(id); resolve(); };
+        abort.signal.addEventListener("abort", onAbort, { once: true });
+      });
+    };
+
+    // Create full-screen black overlay
+    const overlay = document.createElement("div");
+    overlay.id = "cinematic-overlay";
+    document.body.appendChild(overlay);
+
+    // Force layout then fade in (covers game world with black)
+    void overlay.offsetWidth;
+    overlay.classList.add("cinematic-active");
+    audioManager.fadeOutAmbient(1000);
+
+    // Phase 1: fade to black (1000ms CSS transition)
+    await delay(1000);
+
+    // Hide game world under the overlay
+    this.world.visible = false;
+    if (this.flashlight) this.flashlight.setVisible(false);
+
+    if (!abort.signal.aborted) {
+      // Phase 2: add image and fade it in (500ms CSS transition)
+      const img = document.createElement("img");
+      img.className = "cinematic-image";
+      img.src = "/cinematics/sad_ending.png";
+      img.alt = "";
+      img.draggable = false;
+      img.onerror = (): void => {
+        console.warn("[cinematic] sad_ending.png failed to load");
+        abort.abort();
+      };
+      overlay.appendChild(img);
+      void img.offsetWidth;
+      img.classList.add("cinematic-image-visible");
+
+      // Phase 3: hold for 6 seconds (500ms fade-in already running + 5500ms hold)
+      await delay(6500);
+
+      // Phase 4: fade image out (1000ms CSS transition)
+      if (!abort.signal.aborted) {
+        img.classList.remove("cinematic-image-visible");
+        await delay(1000);
+      }
+    }
+
+    // Cleanup overlay
+    this.cinematicAbort = null;
+    overlay.remove();
+
+    // Phase 5: show win end screen
+    this.showWinEndScreen();
+    this.state.phase = "WIN";
     this.locked = false;
+  }
+
+  private showWinEndScreen(): void {
+    const elapsed = performance.now() - this.state.runStats.startTimeMs;
+    const totalSec = Math.floor(elapsed / 1000);
+    const mins = Math.floor(totalSec / 60);
+    const secs = totalSec % 60;
+
+    const el = (id: string): HTMLElement | null => document.getElementById(id);
+
+    const timeEl = el("win-stat-time");
+    const tapesEl = el("win-stat-tapes");
+    const charmEl = el("win-stat-charm");
+    if (timeEl) timeEl.textContent = `${mins}:${String(secs).padStart(2, "0")}`;
+    if (tapesEl) tapesEl.textContent = `${this.state.tapesReconstructed.size}/3`;
+    if (charmEl) charmEl.textContent = this.state.hasWhisperCharm ? "ACQUIRED" : "MISSED";
+
+    el("win-stats")?.classList.add("visible");
+  }
+
+  private hideWinStats(): void {
+    document.getElementById("win-stats")?.classList.remove("visible");
   }
 
   // ── End screen (shared by gameover and win) ──
@@ -2087,8 +2430,16 @@ export class Game {
     this.hud.cancelFade();
     this.clearTutorialTimers();
 
-    // Hide gameover stats
+    // Hide gameover / win stats
     this.hideGameOverStats();
+    this.hideWinStats();
+
+    // Abort cinematic if still running
+    if (this.cinematicAbort) {
+      this.cinematicAbort.abort();
+      this.cinematicAbort = null;
+    }
+    document.getElementById("cinematic-overlay")?.remove();
 
     // Remove end-screen overlay
     if (this.overlayContainer) {
@@ -2125,8 +2476,10 @@ export class Game {
       this.vignetteFlashDuration = 0;
     }
 
-    // Clean up heartbeat
+    // Clean up heartbeat and impact bass
     this.heartbeat.destroy();
+    this.impactBass.destroy();
+    this.frameFreeze.clear();
 
     // Clean up visibility listener
     if (this.visibilityHandler) {
@@ -2146,11 +2499,13 @@ export class Game {
     }
     this.armedRadioAborts.clear();
 
-    // Clean up radio popup and workbench menu
+    // Clean up radio popup, breaker puzzle, and whisper puzzle
     this.radioPopup.destroy();
-    this.workbenchMenu.destroy();
+    this.breakerPuzzle.close();
+    this.whisperPuzzle.close();
+    if (this.tapePuzzle) { this.tapePuzzle.close(); this.tapePuzzle = null; }
 
-    // Clean up crafting effects
+    // Clean up projectiles and effects
     this.projectiles.forEach((p) => p.destroy());
     this.projectiles = [];
     this.flareEffects.forEach((f) => f.destroy());
@@ -2219,7 +2574,11 @@ export class Game {
       if (!pickup.isInteractable()) continue;
       if (!pickup.isInRange(this.player.x)) continue;
       if (pickup.config.togglesTo) {
-        this.hud.showSpritePrompt("key-e", "label-interact");
+        if (pickup.config.id === "breaker_switch" && !this.state.breakerOn) {
+          this.hud.showSpritePrompt("key-e", "label-tune");
+        } else {
+          this.hud.showSpritePrompt("key-e", "label-interact");
+        }
       } else if (isLoreTapeId(pickup.config.id)) {
         this.hud.showSpritePrompt("key-e", "label-pickup");
       } else {
@@ -2228,9 +2587,18 @@ export class Game {
       return;
     }
 
-    // Workbench prompt
-    if (this.isNearWorkbench()) {
-      this.hud.showSpritePrompt("key-e", "label-craft");
+    // Tape station prompt (hidden when no broken tapes in inventory)
+    if (this.isNearTapeStation()) {
+      const available = this.getAvailableBrokenTapes();
+      if (available.length > 0) {
+        this.hud.showSpritePrompt("key-e", "label-rebuild");
+        return;
+      }
+    }
+
+    // Whisper trap prompt (hidden after trapdoor is unlocked)
+    if (this.isNearWhisperTrap() && !this.state.whisperTrapUnlocked) {
+      this.hud.showSpritePrompt("key-e", "label-whisper");
       return;
     }
 
@@ -2248,10 +2616,14 @@ export class Game {
       return;
     }
 
-    // Door prompt
+    // Door prompt (silent exit qualifier when Tape 3 challenge is active)
     const door = this.rooms.getNearbyDoor(this.player.x);
     if (door) {
-      this.hud.showSpritePrompt("key-e", "label-interact");
+      if (door.isExit && this.state.exitFinalChallengeActive) {
+        this.hud.showPrompt("E  EXIT (silent)");
+      } else {
+        this.hud.showSpritePrompt("key-e", "label-interact");
+      }
       return;
     }
 
@@ -2291,7 +2663,7 @@ export class Game {
       transitioning: spot.kind === "desk",
     };
     spot.isOccupied = true;
-    if (spot.kind === "desk") spot.sprite.visible = false;
+    spot.sprite.visible = false;
 
     // Snap player to spot position
     this.player.x = spot.x;
@@ -2344,9 +2716,10 @@ export class Game {
       return;
     }
 
-    // Locker: instant exit (unchanged)
+    // Locker: instant exit
     this.state.hidingState = { active: false, spotId: null, kind: null, transitioning: false };
     spot.isOccupied = false;
+    spot.sprite.visible = true;
     this.player.setStandingPose();
     if (this.flashlight) this.flashlight.setHidingMode("none");
 
@@ -2670,6 +3043,13 @@ export class Game {
         this.screenShake.trigger(400, Math.round(12 * scale));
         this.triggerVignetteFlash(0xff3030, 0.85 * scale, 300);
         this.hud.showSubtitle("[Creature shrieks]", 1500);
+        // Hotfix P: sub-bass impact and frame freeze when close enough
+        // that the lunge is a real threat. scale > 0.3 corresponds to
+        // roughly 1200 px distance (within the 500-1500 px falloff).
+        if (scale > 0.3) {
+          this.impactBass.trigger();
+          this.frameFreeze.trigger(50);
+        }
         break;
       case "retreat":
         this.screenShake.trigger(100, Math.round(3 * scale));
@@ -2969,6 +3349,406 @@ export class Game {
     audioManager.playOneShot("keycard_pickup");
   }
 
+  // ── Breaker puzzle (Hotfix R) ──
+
+  private openBreakerPuzzle(): void {
+    if (this.state.phase !== "PLAYING") return;
+    if (this.breakerPuzzle.isOpen()) return;
+    this.state.phase = "PAUSED";
+    this.app.ticker.stop();
+    void this.breakerPuzzle.open();
+  }
+
+  private handleBreakerResult(result: BreakerPuzzleResult): void {
+    this.input.clearAll();
+
+    switch (result) {
+      case "success":
+        if (this.breakerPickupRef) {
+          this.breakerPickupRef.setToggled();
+          this.breakerPickupRef = null;
+        }
+        this.state.breakerOn = true;
+        this.hud.showMessage("Power restored.");
+        audioManager.playOneShot("breaker_switch");
+        this.triggerVignetteFlash(0xffffff, 0.4, 100);
+        this.breakerPulse?.destroy();
+        this.breakerPulse = null;
+        break;
+      case "fail_wrong_choice":
+      case "fail_timeout":
+        this.breakerPickupRef = null;
+        audioManager.playOneShot("breaker_lock_alarm");
+        if (this.monster) {
+          this.monster.addSuspicion(60);
+          this.monster.startLure({ targetX: 2700, durationMs: 8000 });
+          this.monster.applyDifficultyBuff({
+            speedMultiplier: 1.4,
+            dashChanceMultiplier: 2.0,
+            durationMs: 8000,
+          });
+        }
+        break;
+      case "cancelled":
+        this.breakerPickupRef = null;
+        break;
+    }
+
+    this.state.phase = "PLAYING";
+    this.app.ticker.start();
+  }
+
+  private onBreakerAudioPlay(): void {
+    if (this.monster) this.monster.addSuspicion(5);
+  }
+
+  // ── Whisper lock puzzle (Hotfix S) ──
+
+  private static readonly WHISPER_TRAP_X = 1500;
+  private static readonly WHISPER_TRAP_RANGE = 80;
+
+  private isNearWhisperTrap(): boolean {
+    if (this.state.currentRoom !== "archives") return false;
+    if (this.whisperPuzzle.isOpen()) return false;
+    return Math.abs(this.player.x - Game.WHISPER_TRAP_X) < Game.WHISPER_TRAP_RANGE;
+  }
+
+  private openWhisperPuzzle(): void {
+    if (this.state.phase !== "PLAYING") return;
+    if (this.state.whisperTrapUnlocked) {
+      this.hud.showMessage("The trapdoor is already open.");
+      return;
+    }
+    this.state.phase = "PAUSED";
+    this.app.ticker.stop();
+    this.whisperPuzzle.open();
+  }
+
+  private handleWhisperResult(result: WhisperPuzzleResult): void {
+    this.input.clearAll();
+
+    switch (result) {
+      case "success":
+        this.state.whisperTrapUnlocked = true;
+        this.state.hasWhisperCharm = true;
+        {
+          const charmSlot = this.state.inventorySlots.indexOf(null);
+          if (charmSlot !== -1) {
+            this.state.inventorySlots[charmSlot] = { kind: "whisper_charm" };
+          }
+        }
+        this.hud.showMessage("Whisper charm acquired. Press F to use.");
+        audioManager.playOneShot("whisper_fade");
+        // Dim the trapdoor to signal "opened"
+        if (this.whisperTrapSprite) {
+          this.whisperTrapSprite.alpha = 0.4;
+        }
+        this.trapdoorPulse?.destroy();
+        this.trapdoorPulse = null;
+        this.stopWhisperTrapAmbient();
+        break;
+      case "fail_too_loud":
+      case "fail_timeout":
+        audioManager.playOneShot("whisper_trap_fail");
+        // Force-spawn Whisperer at the trapdoor
+        this.forceSpawnWhispererAt(Game.WHISPER_TRAP_X);
+        // Beacon drain 5x for 20 seconds
+        this.beaconDrainOverride = 5.0;
+        this.beaconDrainOverrideExpiresAt = performance.now() + 20000;
+        break;
+      case "cancelled":
+        break;
+    }
+
+    this.state.phase = "PLAYING";
+    this.app.ticker.start();
+
+    if (result === "success") {
+      this.showWhisperCharmExplainer();
+    }
+  }
+
+  private forceSpawnWhispererAt(x: number): void {
+    if (this.whisperer) {
+      this.whisperer.destroy();
+      this.whisperer = null;
+    }
+    const floorY = this.rooms.currentRoom.floorY;
+    this.whisperer = new Whisperer(this.manifest, this.world, x, floorY);
+  }
+
+  private useWhisperCharm(): void {
+    if (!this.state.hasWhisperCharm) return;
+    this.state.hasWhisperCharm = false;
+    const charmSlot = this.state.inventorySlots.findIndex(
+      (s) => s !== null && s.kind === "whisper_charm",
+    );
+    if (charmSlot !== -1) this.state.inventorySlots[charmSlot] = null;
+    this.hud.showMessage("Whisper charm consumed.");
+    // Lure all monsters in room toward player's current position for 8 seconds
+    const targetX = this.player.x;
+    if (this.monster) {
+      this.monster.addSuspicion(40);
+      this.monster.startLure({ targetX, durationMs: 8000 });
+    }
+    audioManager.playOneShot("whisper_fade");
+  }
+
+  private showWhisperCharmExplainer(): void {
+    if (this.state.whisperCharmExplainerShown) return;
+    this.state.whisperCharmExplainerShown = true;
+
+    this.state.phase = "PAUSED";
+    this.app.ticker.stop();
+
+    // Inject CSS once
+    if (!document.querySelector("#wc-explainer-styles")) {
+      const style = document.createElement("style");
+      style.id = "wc-explainer-styles";
+      style.textContent = `
+        .wc-explainer-overlay {
+          position: fixed; inset: 0;
+          background: rgba(0,0,0,0.85);
+          z-index: 8500;
+          display: flex; align-items: center; justify-content: center;
+          pointer-events: auto;
+        }
+        .wc-explainer-panel {
+          position: relative;
+          max-width: 540px;
+          max-height: 90vh;
+          padding: 24px;
+        }
+        .wc-explainer-image {
+          display: block;
+          width: 100%;
+          max-width: 480px;
+          max-height: 640px;
+          object-fit: contain;
+          filter: drop-shadow(0 0 14px rgba(136,192,160,0.35));
+          pointer-events: none;
+        }
+        .wc-explainer-back {
+          position: absolute;
+          top: 0; right: 0;
+          width: 48px; height: 48px;
+          background: transparent;
+          border: none; padding: 0;
+          cursor: pointer;
+          z-index: 8501;
+        }
+        .wc-explainer-back img {
+          width: 100%; height: 100%;
+          object-fit: contain;
+          pointer-events: none;
+        }
+        .wc-explainer-back:hover img { filter: brightness(1.2); }
+        .wc-explainer-back:focus-visible {
+          outline: 2px solid rgba(136,192,160,0.8);
+          outline-offset: 2px;
+        }
+      `;
+      document.head.appendChild(style);
+    }
+
+    const overlay = document.createElement("div");
+    overlay.className = "wc-explainer-overlay";
+    overlay.innerHTML = `
+      <div class="wc-explainer-panel">
+        <button class="wc-explainer-back" type="button" aria-label="Close">
+          <img src="/ui/back-button.png" alt="Back" />
+        </button>
+        <img class="wc-explainer-image"
+             src="/puzzle-props/whisper_charm_explainer.png"
+             alt="Whisper Charm explainer" />
+      </div>
+    `;
+
+    const closeFn = (): void => this.closeWhisperCharmExplainer(overlay, escHandler);
+
+    const closeBtn = overlay.querySelector<HTMLButtonElement>(".wc-explainer-back");
+    closeBtn?.addEventListener("click", closeFn);
+
+    const escHandler = (e: KeyboardEvent): void => {
+      if (e.key === "Escape") closeFn();
+    };
+    document.addEventListener("keydown", escHandler);
+
+    const img = overlay.querySelector<HTMLImageElement>(".wc-explainer-image");
+    if (img) {
+      img.onerror = (): void => {
+        console.warn("[whisper-charm] explainer image failed to load");
+        closeFn();
+      };
+    }
+
+    document.body.appendChild(overlay);
+  }
+
+  private closeWhisperCharmExplainer(
+    overlay: HTMLElement,
+    escHandler: (e: KeyboardEvent) => void,
+  ): void {
+    document.removeEventListener("keydown", escHandler);
+    overlay.remove();
+    this.state.phase = "PLAYING";
+    this.app.ticker.start();
+  }
+
+  private startWhisperTrapAmbient(): void {
+    if (audioManager.isPlaying("whisper_trap_ambient")) return;
+    audioManager.loop("whisper_trap_ambient");
+    audioManager.setVolume("whisper_trap_ambient", 0);
+  }
+
+  private stopWhisperTrapAmbient(): void {
+    if (!audioManager.isPlaying("whisper_trap_ambient")) return;
+    audioManager.stop("whisper_trap_ambient");
+  }
+
+  private updateWhisperTrapAmbient(playerX: number): void {
+    if (!audioManager.isPlaying("whisper_trap_ambient")) return;
+    const distance = Math.abs(Game.WHISPER_TRAP_X - playerX);
+    const maxDistance = 1000;
+    const multiplier = Math.max(0, 1 - distance / maxDistance);
+    audioManager.setVolume("whisper_trap_ambient", multiplier);
+  }
+
+  private createWhisperTrapSprite(): void {
+    // Only in Archives
+    if (this.state.currentRoom !== "archives") {
+      this.whisperTrapSprite = null;
+      return;
+    }
+    const tex = Assets.get<Texture>("puzzle-props:trapdoor_sealed");
+    if (!tex || tex === Texture.WHITE) {
+      this.whisperTrapSprite = null;
+      return;
+    }
+    this.whisperTrapSprite = new Sprite(tex);
+    this.whisperTrapSprite.anchor.set(0.5, 1.0);
+    this.whisperTrapSprite.x = Game.WHISPER_TRAP_X;
+    this.whisperTrapSprite.y = this.rooms.currentRoom.floorY;
+    this.whisperTrapSprite.scale.set(0.17);
+    this.whisperTrapSprite.zIndex = 20;
+    if (this.state.whisperTrapUnlocked) {
+      this.whisperTrapSprite.alpha = 0.4;
+    }
+    this.world.addChild(this.whisperTrapSprite);
+    if (!this.state.whisperTrapUnlocked) {
+      this.startWhisperTrapAmbient();
+    }
+  }
+
+  // ── Tape reconstruction station (Hotfix T) ──
+
+  private isNearTapeStation(): boolean {
+    if (this.state.currentRoom !== "reception") return false;
+    const wb = ROOM_DEFINITIONS.reception.workbench;
+    if (!wb) return false;
+    return Math.abs(this.player.x - wb.x) < wb.triggerWidth;
+  }
+
+  private getAvailableBrokenTapes(): TapeId[] {
+    const result: TapeId[] = [];
+    for (const id of this.state.brokenTapesCollected) {
+      if (!this.state.tapesReconstructed.has(id)) {
+        result.push(id);
+      }
+    }
+    return result;
+  }
+
+  private openTapeStation(): void {
+    if (this.state.phase !== "PLAYING") return;
+    const available = this.getAvailableBrokenTapes();
+    if (available.length === 0) {
+      if (this.state.tapesReconstructed.size > 0) {
+        this.hud.showMessage("All recordings restored.");
+      } else {
+        this.hud.showMessage("No tape to play.");
+      }
+      return;
+    }
+    // Open puzzle with first available tape (skip selector for simplicity)
+    this.startTapePuzzle(available[0]);
+  }
+
+  private startTapePuzzle(tapeId: TapeId): void {
+    this.state.phase = "PAUSED";
+    this.app.ticker.stop();
+    this.tapePuzzle = new TapePuzzle({
+      tapeId,
+      onResult: (result, id) => this.handleTapeResult(result, id),
+      onFragmentPlay: () => this.onTapeFragmentPlay(),
+    });
+    this.tapePuzzle.open();
+  }
+
+  private handleTapeResult(result: TapePuzzleResult, tapeId: TapeId): void {
+    // On fail_wrong_order, puzzle handles retry internally. Stay paused.
+    if (result === "fail_wrong_order") {
+      audioManager.playOneShot("tape_garbled");
+      // Show feedback above the puzzle overlay (z-index 9000 > puzzle 8000)
+      document.querySelector(".tape-wrong-msg")?.remove();
+      const msg = document.createElement("div");
+      msg.className = "tape-wrong-msg";
+      msg.textContent = "Wrong order. Try again.";
+      msg.style.cssText =
+        "position:fixed;top:18%;left:50%;transform:translateX(-50%);" +
+        "color:#ffcc88;font-family:'Courier New',monospace;font-size:18px;" +
+        "z-index:9000;pointer-events:none;";
+      document.body.appendChild(msg);
+      setTimeout(() => msg.remove(), 2500);
+      return;
+    }
+
+    if (this.tapePuzzle) {
+      this.tapePuzzle.close();
+      this.tapePuzzle = null;
+    }
+    this.input.clearAll();
+
+    if (result === "success") {
+      this.state.tapesReconstructed.add(tapeId);
+      this.state.brokenTapesCollected.delete(tapeId);
+      audioManager.playOneShot("tape_unlock");
+      this.applyTapeReward(tapeId);
+      if (this.workbenchPulse) {
+        this.workbenchPulse.setActive(this.shouldShowWorkbenchPulse());
+      }
+      this.updateWorkbenchOverlay();
+    }
+
+    this.state.phase = "PLAYING";
+    this.app.ticker.start();
+  }
+
+  private applyTapeReward(tapeId: TapeId): void {
+    switch (tapeId) {
+      case "broken_tape_01":
+        this.state.revealMonsterPositions = true;
+        this.hud.enableMinimapThreatMarkers();
+        this.hud.showMessage("Recording restored. Threat positions revealed on map.", 4000);
+        break;
+      case "broken_tape_02":
+        this.state.whisperRadioMode = true;
+        this.hud.showMessage("Recording restored. The recording is intact.", 4000);
+        break;
+      case "broken_tape_03":
+        this.state.exitFinalChallengeActive = true;
+        this.hud.showMessage("Recording restored. The exit listens for silence.", 4000);
+        break;
+    }
+  }
+
+  private onTapeFragmentPlay(): void {
+    // Reception has no monster, so this is mostly a no-op
+    if (this.monster) this.monster.addSuspicion(5);
+  }
+
+  // ── Radio bait ──
+
   private async armCarriedRadio(): Promise<void> {
     if (this.state.phase !== "PLAYING") return;
     if (this.state.radio.carriedRadioId === null) return;
@@ -3262,84 +4042,7 @@ export class Game {
     this.spentRadioSprites.clear();
   }
 
-  // ── Crafting: throw, effects, workbench ──
-
-  private static readonly MATERIAL_IDS = new Set([
-    "wire",
-    "glass_shards",
-    "battery",
-    "tape",
-  ]);
-
-  private throwSelectedItem(): void {
-    const slot = this.state.inventorySlots[this.state.selectedSlot];
-    if (!slot || slot.kind !== "crafted") return;
-
-    const itemId = slot.id;
-    this.state.inventorySlots[this.state.selectedSlot] = null;
-
-    const dir = this.player.facingDirection;
-    const floorY = this.currentFloorY();
-
-    let textureAlias: string;
-    switch (itemId) {
-      case "flare":
-        textureAlias = "flare:unlit";
-        break;
-      case "smoke_bomb":
-        textureAlias = "smokebomb:idle";
-        break;
-      case "decoy_radio":
-        textureAlias = "decoy-radio:idle";
-        break;
-    }
-
-    const texture = Assets.get<Texture>(textureAlias) || Texture.WHITE;
-    const projectile = new Projectile(
-      this.world,
-      texture,
-      this.player.x,
-      floorY - 40,
-      dir * 600,
-      -500,
-      1500,
-      floorY,
-      0.12,
-      (landX, landY) => this.onItemLand(itemId, landX, landY),
-    );
-    this.projectiles.push(projectile);
-
-    if (audioManager.has("radio_throw")) {
-      audioManager.playOneShot("radio_throw");
-    }
-  }
-
-  private onItemLand(itemId: CraftedItemId, x: number, y: number): void {
-    switch (itemId) {
-      case "flare": {
-        const flare = new FlareEffect(this.world, x, y);
-        this.flareEffects.push(flare);
-        // Listener attraction on ignition
-        if (this.monster) this.monster.addSuspicion(30);
-        break;
-      }
-      case "smoke_bomb": {
-        const smoke = new SmokeBombEffect(this.world, x, y);
-        this.smokeBombEffects.push(smoke);
-        break;
-      }
-      case "decoy_radio": {
-        const decoy = new DecoyEffect(this.world, x, y);
-        this.decoyEffects.push(decoy);
-        // Lure monster toward decoy for 3 seconds
-        if (this.monster) {
-          this.monster.startLure({ targetX: x, durationMs: 3000 });
-          this.monster.addSuspicion(30);
-        }
-        break;
-      }
-    }
-  }
+  // ── Projectile and effect updates (dormant after Hotfix Q) ──
 
   private updateProjectiles(dtMS: number): void {
     for (const p of this.projectiles) p.update(dtMS);
@@ -3385,33 +4088,6 @@ export class Game {
       }
       return true;
     });
-  }
-
-  private isNearWorkbench(): boolean {
-    const def = ROOM_DEFINITIONS[this.state.currentRoom];
-    if (!def.workbench) return false;
-    return Math.abs(this.player.x - def.workbench.x) < def.workbench.triggerWidth;
-  }
-
-  private async openWorkbench(): Promise<void> {
-    if (this.state.phase !== "PLAYING") return;
-
-    this.state.phase = "PAUSED";
-    this.app.ticker.stop();
-
-    const result = await this.workbenchMenu.show(this.state.inventorySlots);
-    this.input.clearAll();
-
-    if (result !== null) {
-      const recipe = RECIPES[result.recipeIndex];
-      if (craft(this.state.inventorySlots, recipe)) {
-        this.hud.showMessage(`Crafted ${recipe.name}.`, 2000);
-        audioManager.playOneShot("keycard_pickup");
-      }
-    }
-
-    this.state.phase = "PLAYING";
-    this.app.ticker.start();
   }
 
   // ── Camera ──

@@ -42,7 +42,21 @@ export type SfxId =
   | "floor_jumper_attack_charge"
   | "floor_jumper_attack_lunge"
   | "floor_jumper_crawl"
-  | "floor_jumper_retreat";
+  | "floor_jumper_retreat"
+  | "breaker_original"
+  | "breaker_variant_a"
+  | "breaker_variant_b"
+  | "breaker_variant_c"
+  | "breaker_lock_alarm"
+  | "whisper_trap_ambient"
+  | "whisper_trap_fail"
+  | "tape_garbled"
+  | "tape_unlock";
+
+export type TapeSegmentId =
+  | "tape_01_seg_1" | "tape_01_seg_2" | "tape_01_seg_3" | "tape_01_seg_4"
+  | "tape_02_seg_1" | "tape_02_seg_2" | "tape_02_seg_3" | "tape_02_seg_4"
+  | "tape_03_seg_1" | "tape_03_seg_2" | "tape_03_seg_3" | "tape_03_seg_4";
 
 export type RadioVoiceId =
   | "radio_intro"
@@ -61,7 +75,7 @@ export type MapNarrationId = "tape_map_fragment";
 
 export type IntroNarrationId = "intro_panel_1" | "intro_panel_2" | "intro_panel_3";
 
-export type AudioId = AmbientId | MonsterVocalId | MonsterConfusedVocalId | SfxId | RadioVoiceId | WhispererVoiceId | LoreTapeId | TutorialId | MapNarrationId | IntroNarrationId;
+export type AudioId = AmbientId | MonsterVocalId | MonsterConfusedVocalId | SfxId | RadioVoiceId | WhispererVoiceId | LoreTapeId | TutorialId | MapNarrationId | IntroNarrationId | TapeSegmentId;
 
 export interface WhispererVoiceSettings {
   stability: number;
@@ -406,6 +420,100 @@ export const AUDIO_CATALOG: Record<AudioId, AudioAsset> = {
     volume: 0.65,
   },
 
+  // BREAKER PUZZLE SFX (Sound Effects API)
+  breaker_original: {
+    id: "breaker_original",
+    category: "sfx",
+    prompt: "Heavy industrial relay switch CLICK followed by a deep electrical HUM that lasts 1 second. Loud, clear, distinct relay sound. Vintage 1970s power breaker. Mono, fully audible.",
+    durationSec: 2.0,
+    loop: false,
+    volume: 1.0,
+  },
+  breaker_variant_a: {
+    id: "breaker_variant_a",
+    category: "sfx",
+    prompt: "Small electrical relay click, HIGH PITCH like a tiny mechanical switch, followed by a thin high-frequency buzz. Distinctly higher and lighter than a large industrial relay. Loud, mono, 2 seconds.",
+    durationSec: 2.0,
+    loop: false,
+    volume: 1.0,
+  },
+  breaker_variant_b: {
+    id: "breaker_variant_b",
+    category: "sfx",
+    prompt: "Industrial relay switch click followed by LOUD electrical STATIC CRACKLE and sparks. Like a faulty breaker arcing. The crackle is the dominant sound. Mono, loud, 2 seconds.",
+    durationSec: 2.0,
+    loop: false,
+    volume: 1.0,
+  },
+  breaker_variant_c: {
+    id: "breaker_variant_c",
+    category: "sfx",
+    prompt: "TWO industrial relay clicks 300 milliseconds apart, like a double-tap, followed by a brief electrical hum. The double click is rhythmic and clearly two separate clicks. Loud, mono, 2.5 seconds.",
+    durationSec: 2.5,
+    loop: false,
+    volume: 1.0,
+  },
+  breaker_lock_alarm: {
+    id: "breaker_lock_alarm",
+    category: "sfx",
+    prompt: "Loud industrial alarm BUZZER, harsh and continuous, like a security system alarm. Aggressive electronic warning sound. Mono, full volume, 2.5 seconds.",
+    durationSec: 2.5,
+    loop: false,
+    volume: 1.0,
+  },
+
+  // WHISPER LOCK PUZZLE SFX (Sound Effects API)
+  whisper_trap_ambient: {
+    id: "whisper_trap_ambient",
+    category: "sfx",
+    prompt: "Faint indistinct whisper voices, distant, layered, ominous, mono, loopable seamlessly",
+    durationSec: 6.0,
+    loop: true,
+    volume: 0.18,
+  },
+  whisper_trap_fail: {
+    id: "whisper_trap_fail",
+    category: "sfx",
+    prompt: "Painful breath inhale then ghostly distorted shriek, 1.5 seconds, mono",
+    durationSec: 1.5,
+    loop: false,
+    volume: 0.9,
+  },
+
+  // TAPE STATION SFX
+  tape_garbled: {
+    id: "tape_garbled",
+    category: "sfx",
+    prompt: "Cassette tape playing backwards garbled, 2 seconds, mono, lo-fi",
+    durationSec: 2.0,
+    loop: false,
+    volume: 0.8,
+  },
+  tape_unlock: {
+    id: "tape_unlock",
+    category: "sfx",
+    prompt: "Cassette tape click followed by a soft chime, 1 second, mono",
+    durationSec: 1.0,
+    loop: false,
+    volume: 0.85,
+  },
+
+  // TAPE STATION SEGMENTS (TTS - Adam voice, dramatic narration)
+  tape_01_seg_1: { id: "tape_01_seg_1", category: "lore_tape", prompt: "we saw the lights", loop: false, volume: 0.85, voiceId: "pNInz6obpgDQGcFmaJgB", modelId: "eleven_turbo_v2_5", voiceSettings: { stability: 0.5, similarity_boost: 0.75, style: 0.3, use_speaker_boost: true } },
+  tape_01_seg_2: { id: "tape_01_seg_2", category: "lore_tape", prompt: "then the listening began", loop: false, volume: 0.85, voiceId: "pNInz6obpgDQGcFmaJgB", modelId: "eleven_turbo_v2_5", voiceSettings: { stability: 0.5, similarity_boost: 0.75, style: 0.3, use_speaker_boost: true } },
+  tape_01_seg_3: { id: "tape_01_seg_3", category: "lore_tape", prompt: "and we forgot", loop: false, volume: 0.85, voiceId: "pNInz6obpgDQGcFmaJgB", modelId: "eleven_turbo_v2_5", voiceSettings: { stability: 0.5, similarity_boost: 0.75, style: 0.3, use_speaker_boost: true } },
+  tape_01_seg_4: { id: "tape_01_seg_4", category: "lore_tape", prompt: "our names", loop: false, volume: 0.85, voiceId: "pNInz6obpgDQGcFmaJgB", modelId: "eleven_turbo_v2_5", voiceSettings: { stability: 0.5, similarity_boost: 0.75, style: 0.3, use_speaker_boost: true } },
+
+  tape_02_seg_1: { id: "tape_02_seg_1", category: "lore_tape", prompt: "your voice is not yours", loop: false, volume: 0.85, voiceId: "pNInz6obpgDQGcFmaJgB", modelId: "eleven_turbo_v2_5", voiceSettings: { stability: 0.5, similarity_boost: 0.75, style: 0.3, use_speaker_boost: true } },
+  tape_02_seg_2: { id: "tape_02_seg_2", category: "lore_tape", prompt: "it belongs to the walls", loop: false, volume: 0.85, voiceId: "pNInz6obpgDQGcFmaJgB", modelId: "eleven_turbo_v2_5", voiceSettings: { stability: 0.5, similarity_boost: 0.75, style: 0.3, use_speaker_boost: true } },
+  tape_02_seg_3: { id: "tape_02_seg_3", category: "lore_tape", prompt: "they whisper back", loop: false, volume: 0.85, voiceId: "pNInz6obpgDQGcFmaJgB", modelId: "eleven_turbo_v2_5", voiceSettings: { stability: 0.5, similarity_boost: 0.75, style: 0.3, use_speaker_boost: true } },
+  tape_02_seg_4: { id: "tape_02_seg_4", category: "lore_tape", prompt: "when you speak", loop: false, volume: 0.85, voiceId: "pNInz6obpgDQGcFmaJgB", modelId: "eleven_turbo_v2_5", voiceSettings: { stability: 0.5, similarity_boost: 0.75, style: 0.3, use_speaker_boost: true } },
+
+  tape_03_seg_1: { id: "tape_03_seg_1", category: "lore_tape", prompt: "the door at the top", loop: false, volume: 0.85, voiceId: "pNInz6obpgDQGcFmaJgB", modelId: "eleven_turbo_v2_5", voiceSettings: { stability: 0.5, similarity_boost: 0.75, style: 0.3, use_speaker_boost: true } },
+  tape_03_seg_2: { id: "tape_03_seg_2", category: "lore_tape", prompt: "opens for those who listen", loop: false, volume: 0.85, voiceId: "pNInz6obpgDQGcFmaJgB", modelId: "eleven_turbo_v2_5", voiceSettings: { stability: 0.5, similarity_boost: 0.75, style: 0.3, use_speaker_boost: true } },
+  tape_03_seg_3: { id: "tape_03_seg_3", category: "lore_tape", prompt: "the others stay below", loop: false, volume: 0.85, voiceId: "pNInz6obpgDQGcFmaJgB", modelId: "eleven_turbo_v2_5", voiceSettings: { stability: 0.5, similarity_boost: 0.75, style: 0.3, use_speaker_boost: true } },
+  tape_03_seg_4: { id: "tape_03_seg_4", category: "lore_tape", prompt: "forever", loop: false, volume: 0.85, voiceId: "pNInz6obpgDQGcFmaJgB", modelId: "eleven_turbo_v2_5", voiceSettings: { stability: 0.5, similarity_boost: 0.75, style: 0.3, use_speaker_boost: true } },
+
   // RADIO OPERATOR VOICE (TTS)
   radio_intro: {
     id: "radio_intro",
@@ -635,7 +743,7 @@ export const AUDIO_CATALOG: Record<AudioId, AudioAsset> = {
   tutorial_t3: {
     id: "tutorial_t3",
     category: "lore_tape",
-    prompt: "Find the keycard, flip the breaker, reach the stairwell. Find materials in other rooms and craft tools at the workbench.",
+    prompt: "Find the keycard, flip the breaker, reach the stairwell.",
     loop: false,
     volume: 0.85,
     voiceId: "pNInz6obpgDQGcFmaJgB",
@@ -680,7 +788,7 @@ export const TUTORIAL_TRANSCRIPTS: Record<TutorialId, string> = {
   tutorial_t0: "If you can hear this, get out. It hunts by sound. Stay quiet. Stay hidden.",
   tutorial_t1: "This is field operator. Your flashlight is voice-activated. Speak into your microphone to keep it lit.",
   tutorial_t2: "The thing in the dark hears you. Whisper safely. Talk if you need to see. Never shout unless you have to.",
-  tutorial_t3: "Find the keycard, flip the breaker, reach the stairwell. Find materials in other rooms and craft tools at the workbench.",
+  tutorial_t3: "Find the keycard, flip the breaker, reach the stairwell.",
 };
 
 export const MAP_FRAGMENT_TRANSCRIPT =

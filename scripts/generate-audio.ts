@@ -23,7 +23,7 @@ async function main() {
   const onlyId = onlyIdx >= 0 ? args[onlyIdx + 1] : null;
 
   const targets: AudioAsset[] = onlyId
-    ? [AUDIO_CATALOG[onlyId as AudioId]].filter(Boolean)
+    ? onlyId.split(",").map((id) => AUDIO_CATALOG[id.trim() as AudioId]).filter(Boolean)
     : Object.values(AUDIO_CATALOG);
 
   if (listOnly) {

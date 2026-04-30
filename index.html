@@ -204,6 +204,86 @@
       letter-spacing: 2px;
     }
 
+    /* Sad ending cinematic overlay (Hotfix U.27) */
+    #cinematic-overlay {
+      position: fixed;
+      inset: 0;
+      background: #000;
+      z-index: 10000;
+      opacity: 0;
+      transition: opacity 1000ms ease-out;
+    }
+    #cinematic-overlay.cinematic-active {
+      opacity: 1;
+    }
+    .cinematic-image {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      max-width: 100vw;
+      max-height: 100vh;
+      object-fit: contain;
+      opacity: 0;
+      transition: opacity 500ms ease-in;
+      user-select: none;
+      pointer-events: none;
+    }
+    .cinematic-image.cinematic-image-visible {
+      opacity: 1;
+    }
+
+    /* Win end screen (Hotfix U.27) */
+    #win-stats {
+      position: fixed;
+      inset: 0;
+      background: #0a0806;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1100;
+      font-family: 'Courier New', monospace;
+    }
+    #win-stats.visible {
+      display: flex;
+    }
+    #win-stats .win-content {
+      text-align: center;
+      padding: 48px;
+      max-width: 420px;
+    }
+    #win-stats h1 {
+      font-size: 42px;
+      color: #c44030;
+      letter-spacing: 6px;
+      margin: 0 0 12px 0;
+      text-shadow: 0 0 16px rgba(180, 40, 30, 0.5);
+    }
+    #win-stats .win-subtitle {
+      font-size: 13px;
+      color: #a08060;
+      letter-spacing: 3px;
+      margin-bottom: 36px;
+      opacity: 0.7;
+      font-style: italic;
+    }
+    #win-stats .stat-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 14px;
+      padding: 10px 0;
+      border-bottom: 1px solid #2a2018;
+    }
+    #win-stats .stat-label { color: #706050; letter-spacing: 1px; }
+    #win-stats .stat-value { color: #d4c4a8; }
+    #win-stats .win-restart {
+      margin-top: 36px;
+      font-size: 13px;
+      color: #504030;
+      letter-spacing: 3px;
+      animation: pulse 3s infinite;
+    }
+
     /* Radio ARM popup overlay */
     #radio-popup {
       position: fixed;
@@ -415,6 +495,18 @@
       <div class="stat-row"><span class="stat-label">Rooms reached</span><span class="stat-value" id="stat-rooms">0/4</span></div>
       <div class="stat-row"><span class="stat-label">Monster encounters</span><span class="stat-value" id="stat-encounters">0</span></div>
       <div class="restart-prompt">Press R to continue</div>
+    </div>
+  </div>
+
+  <!-- Win end screen (Hotfix U.27) -->
+  <div id="win-stats">
+    <div class="win-content">
+      <h1>YOU NEVER LEFT</h1>
+      <div class="win-subtitle">The building keeps what it takes.</div>
+      <div class="stat-row"><span class="stat-label">Time</span><span class="stat-value" id="win-stat-time">0:00</span></div>
+      <div class="stat-row"><span class="stat-label">Tapes reconstructed</span><span class="stat-value" id="win-stat-tapes">0/3</span></div>
+      <div class="stat-row"><span class="stat-label">Whisper charm</span><span class="stat-value" id="win-stat-charm">MISSED</span></div>
+      <div class="win-restart">PRESS R TO RESTART</div>
     </div>
   </div>
 

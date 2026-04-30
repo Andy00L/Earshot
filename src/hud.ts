@@ -146,11 +146,13 @@ export class HUD {
       };
       return map[item.id];
     }
+    if (item.kind === "whisper_charm") return "puzzle-props:whisper_charm";
     return "radio";
   }
 
   private static iconScale(item: InventorySlotItem): number {
     if (item.kind === "radio") return 0.03;
+    if (item.kind === "whisper_charm") return 0.03;
     return 0.07;
   }
 
@@ -532,6 +534,10 @@ export class HUD {
     } else {
       this.minimap.hide();
     }
+  }
+
+  enableMinimapThreatMarkers(): void {
+    this.minimap.enableThreatMarkers();
   }
 
   private clearMessage(): void {

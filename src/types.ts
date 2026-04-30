@@ -51,7 +51,11 @@ export type PickupId =
   | "battery"
   | "tape"
   | "map_fragment"
-  | LoreTapeId;
+  | LoreTapeId
+  | TapeId;
+
+// Broken tape IDs (collectible fragments for reconstruction station)
+export type TapeId = "broken_tape_01" | "broken_tape_02" | "broken_tape_03";
 
 // Phase 5: Crafting inventory
 export type MaterialId = "wire" | "glass_shards" | "battery" | "tape";
@@ -60,7 +64,8 @@ export type CraftedItemId = "flare" | "smoke_bomb" | "decoy_radio";
 export type InventorySlotItem =
   | { kind: "material"; id: MaterialId }
   | { kind: "crafted"; id: CraftedItemId }
-  | { kind: "radio" };
+  | { kind: "radio" }
+  | { kind: "whisper_charm" };
 
 export interface WorkbenchDef {
   x: number;
@@ -75,7 +80,7 @@ export interface Shade {
 }
 
 // Game phases. Drives main loop branching.
-export type GamePhase = "INTRO" | "PLAYING" | "PAUSED" | "DYING" | "GAMEOVER" | "WIN";
+export type GamePhase = "INTRO" | "PLAYING" | "PAUSED" | "DYING" | "GAMEOVER" | "CINEMATIC" | "WIN";
 
 // Door unlock requirements.
 export type DoorRequirement = "none" | "press_e" | "keycard" | "breaker_on";
@@ -104,6 +109,8 @@ export interface PickupConfig {
   frame: string;     // props atlas frame name
   pickupRange: number;
   togglesTo?: string; // if set, interaction swaps frame instead of collecting
+  tint?: number;      // optional 0xRRGGBB tint applied to pickup sprite
+  scale?: number;     // optional scale override (default 0.3 in pickup.ts)
 }
 
 export interface HidingState {
@@ -136,6 +143,14 @@ export interface GameState {
   activeShade: Shade | null;
   tapesCollected: Set<LoreTapeId>;
   tutorialPlayed: { t0: boolean; t1: boolean; t2: boolean; t3: boolean };
+  whisperTrapUnlocked: boolean;
+  hasWhisperCharm: boolean;
+  whisperCharmExplainerShown: boolean;
+  brokenTapesCollected: Set<TapeId>;
+  tapesReconstructed: Set<TapeId>;
+  revealMonsterPositions: boolean;
+  whisperRadioMode: boolean;
+  exitFinalChallengeActive: boolean;
 }
 
 export function createInitialGameState(): GameState {
@@ -166,6 +181,14 @@ export function createInitialGameState(): GameState {
     activeShade: null,
     tapesCollected: new Set<LoreTapeId>(),
     tutorialPlayed: { t0: false, t1: false, t2: false, t3: false },
+    whisperTrapUnlocked: false,
+    hasWhisperCharm: false,
+    whisperCharmExplainerShown: false,
+    brokenTapesCollected: new Set<TapeId>(),
+    tapesReconstructed: new Set<TapeId>(),
+    revealMonsterPositions: false,
+    whisperRadioMode: false,
+    exitFinalChallengeActive: false,
   };
 }
 

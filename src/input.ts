@@ -88,6 +88,11 @@ export class Input {
     return this.justPressed("KeyG");
   }
 
+  /** Returns true on the single frame F was first pressed (use whisper charm). */
+  justUsedCharm(): boolean {
+    return this.justPressed("KeyF");
+  }
+
   /** Returns the inventory slot selected this frame (0, 1, 2) or -1 if none. */
   justSelectedSlot(): number {
     if (this.justPressed("Digit1")) return 0;

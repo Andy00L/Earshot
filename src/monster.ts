@@ -75,6 +75,11 @@ export class Monster extends Container {
   private lureTargetX: number | null = null;
   private lureExpiresAt: number = 0;
 
+  // Temporary difficulty buff (applied on puzzle fail)
+  private speedMultiplier: number = 1.0;
+  private dashChanceMultiplier: number = 1.0;
+  private buffExpiresAt: number = 0;
+
   // Sprite and animation
   private sprite: Sprite;
   private manifest: Manifest;
@@ -166,6 +171,25 @@ export class Monster extends Container {
     }
   }
 
+  /** Temporarily boost speed and dash chance (decays after durationMs). */
+  public applyDifficultyBuff(opts: {
+    speedMultiplier: number;
+    dashChanceMultiplier: number;
+    durationMs: number;
+  }): void {
+    this.speedMultiplier = opts.speedMultiplier;
+    this.dashChanceMultiplier = opts.dashChanceMultiplier;
+    this.buffExpiresAt = performance.now() + opts.durationMs;
+  }
+
+  private updateBuff(): void {
+    if (this.buffExpiresAt > 0 && performance.now() >= this.buffExpiresAt) {
+      this.speedMultiplier = 1.0;
+      this.dashChanceMultiplier = 1.0;
+      this.buffExpiresAt = 0;
+    }
+  }
+
   /** Returns lure target if active, otherwise player position. */
   private getHuntTargetX(): number {
     if (this.lureTargetX !== null && performance.now() < this.lureExpiresAt) {
@@ -179,6 +203,8 @@ export class Monster extends Container {
   public onDashStart: (() => void) | null = null;
 
   update(dt: number, dtMS: number): void {
+    this.updateBuff();
+
     // Confused animation overrides normal frame cycling when lured
     if (this.isLured) {
       this.updateLureAnimation(dtMS);
@@ -240,7 +266,7 @@ export class Monster extends Container {
 
     // Dash sub-mode: roll once per CHARGE entry
     if (newState === "CHARGE") {
-      this.isDashing = Math.random() < DASH_PROBABILITY;
+      this.isDashing = Math.random() < DASH_PROBABILITY * this.dashChanceMultiplier;
       if (this.isDashing) {
         this.onDashStart?.();
       }
@@ -304,7 +330,7 @@ export class Monster extends Container {
     }
 
     this.facing = dx > 0 ? 1 : -1;
-    this.x += this.facing * PATROL_SPEED * dt;
+    this.x += this.facing * PATROL_SPEED * this.speedMultiplier * dt;
   }
 
   private updateAlert(): void {
@@ -333,7 +359,7 @@ export class Monster extends Container {
     const targetX = this.getHuntTargetX();
     const dx = targetX - this.x;
     this.facing = dx > 0 ? 1 : -1;
-    this.x += this.facing * HUNT_SPEED * dt;
+    this.x += this.facing * HUNT_SPEED * this.speedMultiplier * dt;
 
     // Close enough to charge
     if (Math.abs(dx) <= CHARGE_TRIGGER) {
@@ -349,7 +375,7 @@ export class Monster extends Container {
     const targetX = this.getHuntTargetX();
     const dx = targetX - this.x;
     this.facing = dx > 0 ? 1 : -1;
-    this.x += this.facing * chargeSpeed * dt;
+    this.x += this.facing * chargeSpeed * this.speedMultiplier * dt;
 
     if (Math.abs(dx) <= ATTACK_TRIGGER) {
       this.enterState("ATTACK");

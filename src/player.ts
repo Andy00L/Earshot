@@ -6,7 +6,10 @@ import type { HidingSpotKind } from './types';
 export type PlayerState =
   | 'IDLE'
   | 'WALK'
+  | 'SCARED_IDLE'
+  | 'SCARED_WALK'
   | 'RUN'
+  | 'RUN_STOP'
   | 'CROUCH_IDLE'
   | 'CROUCH_WALK'
   | 'HIDING_LOCKER'
@@ -27,10 +30,13 @@ interface AnimDef {
 const ANIM_DEFS: Record<PlayerState, AnimDef> = {
   IDLE:           { frameNames: ['idle'],                                                         speed: 0,     moveSpeed: 0 },
   WALK:           { frameNames: ['walk1', 'walk2', 'walk3', 'walk4'],                             speed: 0.13,  moveSpeed: 3 },
+  SCARED_IDLE:    { frameNames: ['scared-idle1', 'scared-idle2'],                                 speed: 0.04,  moveSpeed: 0, visualScale: 0.90 },
+  SCARED_WALK:    { frameNames: ['walk1', 'walk2', 'walk3', 'walk4'],                             speed: 0.13,  moveSpeed: 3 },
   RUN:            { frameNames: ['run1', 'run2', 'run3', 'run4'],                                 speed: 0.2,   moveSpeed: 6 },
-  CROUCH_IDLE:    { frameNames: ['crouch-idle1', 'crouch-idle2'],                                 speed: 0.05,  moveSpeed: 0 },
-  CROUCH_WALK:    { frameNames: ['crouch-walk1', 'crouch-walk2', 'crouch-walk3', 'crouch-walk4'], speed: 0.1,   moveSpeed: 1.5 },
-  HIDING_LOCKER:  { frameNames: ['crouch-idle1', 'crouch-idle2'],                                 speed: 0.03,  moveSpeed: 0 },
+  RUN_STOP:       { frameNames: ['run-stop'],                                                     speed: 0,     moveSpeed: 0 },
+  CROUCH_IDLE:    { frameNames: ['crouch-idle1', 'crouch-idle2'],                                 speed: 0.05,  moveSpeed: 0, visualScale: 0.79 },
+  CROUCH_WALK:    { frameNames: ['crouch-walk1', 'crouch-walk2', 'crouch-walk3', 'crouch-walk4'], speed: 0.1,   moveSpeed: 1.5, visualScale: 0.79 },
+  HIDING_LOCKER:  { frameNames: ['locker-hide'],                                                  speed: 0,     moveSpeed: 0, visualScale: 0.21 },
   HIDING_DESK_ENTERING: {
     frameNames: ['hide-desk-enter1', 'hide-desk-enter2', 'hide-desk-enter3', 'hide-desk-enter4', 'hide-desk-enter5', 'hide-desk-enter6'],
     speed: 0.15,
@@ -67,6 +73,14 @@ export class Player extends Container {
   // Caught sequence state
   private stateLocked = false;
   public caughtComplete = false;
+
+  // Run-stop deceleration timer (200ms after exiting RUN)
+  private wasRunning = false;
+  private runStopUntilMs = 0;
+
+  // Scared walk look-back interrupt (glance over shoulder every 3-4.5s)
+  private scaredLookBackUntilMs = 0;
+  private nextScaredLookBackMs = 0;
 
   // Desk hide animation callbacks (wired by game.ts)
   public onDeskEnterComplete: (() => void) | null = null;
@@ -215,29 +229,72 @@ export class Player extends Container {
     );
   }
 
-  update(dt: number, input: Input) {
+  update(dt: number, input: Input, scared = false) {
     // During caught sequence, AnimatedSprite auto-plays via Ticker.shared.
     if (this.stateLocked) return;
 
     const moving = input.isLeft() || input.isRight();
+    const isRunning = moving && input.isRunning() && !input.isCrouching();
 
-    // Ctrl wins over Shift when both held simultaneously
+    // Detect run exit for 200ms deceleration frame
+    if (this.wasRunning && !isRunning) {
+      this.runStopUntilMs = performance.now() + 200;
+    }
+    this.wasRunning = isRunning;
+
+    // Priority: crouch > run > run_stop > scared > calm
     let newState: PlayerState;
     if (moving) {
       if (input.isCrouching()) {
         newState = 'CROUCH_WALK';
-      } else if (input.isRunning()) {
+      } else if (isRunning) {
         newState = 'RUN';
       } else {
-        newState = 'WALK';
+        newState = scared ? 'SCARED_WALK' : 'WALK';
       }
+    } else if (this.runStopUntilMs > 0 && performance.now() < this.runStopUntilMs) {
+      newState = 'RUN_STOP';
     } else {
-      newState = input.isCrouching() ? 'CROUCH_IDLE' : 'IDLE';
+      this.runStopUntilMs = 0;
+      if (input.isCrouching()) {
+        newState = 'CROUCH_IDLE';
+      } else {
+        newState = scared ? 'SCARED_IDLE' : 'IDLE';
+      }
     }
 
     this.setState(newState);
 
-    const speed = ANIM_DEFS[this.currentState].moveSpeed;
+    // Scared walk look-back interrupt: briefly show scared-walk1 (glance over shoulder)
+    if (this.currentState === 'SCARED_WALK') {
+      const now = performance.now();
+      if (this.nextScaredLookBackMs === 0) {
+        this.nextScaredLookBackMs = now + 3000;
+      }
+      if (this.scaredLookBackUntilMs > 0) {
+        if (now >= this.scaredLookBackUntilMs) {
+          // Look-back ended: schedule next, restore walk textures
+          this.scaredLookBackUntilMs = 0;
+          this.nextScaredLookBackMs = now + 3000 + Math.random() * 1500;
+          this.currentState = undefined as unknown as PlayerState;
+          this.setState('SCARED_WALK');
+        }
+        // else: still holding look-back frame (texture already set)
+      } else if (now >= this.nextScaredLookBackMs) {
+        // Start look-back: swap to single scared-walk1 frame for 300ms
+        this.scaredLookBackUntilMs = now + 300;
+        const lookBackTexture = getFrameTexture(this.manifest, 'player', 'scared-walk1');
+        this.sprite.textures = [lookBackTexture];
+        this.sprite.gotoAndStop(0);
+        this.activeFrameNames = ['scared-walk1'];
+        this.updateAnchor(0);
+      }
+    } else {
+      this.scaredLookBackUntilMs = 0;
+      this.nextScaredLookBackMs = 0;
+    }
+
+    const speed = ANIM_DEFS[this.currentState ?? 'IDLE'].moveSpeed;
     let dx = 0;
     if (input.isLeft()) dx -= 1;
     if (input.isRight()) dx += 1;
@@ -247,7 +304,9 @@ export class Player extends Container {
       this.x += dx * speed * dt;
     }
 
-    this.sprite.scale.x = this.facing;
+    let vs = ANIM_DEFS[this.currentState ?? 'IDLE'].visualScale ?? 1.0;
+    if (this.scaredLookBackUntilMs > 0) vs = 0.93; // scared-walk1 frame is oversized
+    this.sprite.scale.set(this.facing * vs, vs);
     this.x = Math.max(60, Math.min(this.roomWidth - 60, this.x));
   }
 }

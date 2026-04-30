@@ -9,6 +9,7 @@ export class MicAnalyser {
 
   private stream: MediaStream | null = null;
   private source: MediaStreamAudioSourceNode | null = null;
+  private gainNode: GainNode | null = null;
   private analyser: AnalyserNode | null = null;
   private pcmBuffer: Float32Array<ArrayBuffer> | null = null;
 
@@ -53,8 +54,12 @@ export class MicAnalyser {
     this.analyser.fftSize = 2048;
     this.analyser.smoothingTimeConstant = 0;
 
+    this.gainNode = ctx.createGain();
+    this.gainNode.gain.value = 1.0;
+
     this.source = ctx.createMediaStreamSource(this.stream);
-    this.source.connect(this.analyser);
+    this.source.connect(this.gainNode);
+    this.gainNode.connect(this.analyser);
     // Do NOT connect analyser to ctx.destination (no mic playback)
 
     this.pcmBuffer = new Float32Array(this.analyser.fftSize);
@@ -68,6 +73,16 @@ export class MicAnalyser {
         this.smoothedRms = 0;
         console.warn(this.lastErrorMessage);
       };
+    }
+  }
+
+  /**
+   * Set the mic input gain. 1.0 = normal, >1 = louder, <1 = quieter.
+   * Used by run (3.0x) and crouch (0.2x) mechanics.
+   */
+  setGain(value: number): void {
+    if (this.gainNode) {
+      this.gainNode.gain.value = value;
     }
   }
 
@@ -96,8 +111,10 @@ export class MicAnalyser {
       this.stream = null;
     }
     this.source?.disconnect();
+    this.gainNode?.disconnect();
     this.analyser?.disconnect();
     this.source = null;
+    this.gainNode = null;
     this.analyser = null;
     this.pcmBuffer = null;
     this.state = "idle";

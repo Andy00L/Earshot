@@ -22,7 +22,11 @@ export class Pickup {
     this.sprite.y = floorY + config.y;
 
     // Scale down large atlas props to fit the scene
-    this.sprite.scale.set(0.3);
+    this.sprite.scale.set(config.scale ?? 0.3);
+
+    if (config.tint !== undefined) {
+      this.sprite.tint = config.tint;
+    }
 
     parent.addChild(this.sprite);
   }

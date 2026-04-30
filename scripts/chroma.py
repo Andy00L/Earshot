@@ -79,6 +79,49 @@ def chroma_key_hsv(
     return np.dstack([out, alpha])
 
 
+# HSV thresholds for magenta/pink background (ChatGPT-generated sprites).
+# Magenta (R high, G low, B high) sits at H ~150 in OpenCV's 0-180 scale.
+HSV_LOWER_MAGENTA = np.array([125, 80, 80], dtype=np.uint8)
+HSV_UPPER_MAGENTA = np.array([170, 255, 255], dtype=np.uint8)
+
+
+def chroma_key_magenta(
+    rgb: np.ndarray,
+    feather_radius: int = DEFAULT_FEATHER_RADIUS,
+) -> np.ndarray:
+    """
+    Convert an RGB image (H, W, 3) to RGBA with magenta background keyed out.
+
+    Same pipeline as chroma_key_hsv but tuned for magenta backgrounds where
+    R and B are high and G is near zero.
+    """
+    if rgb.ndim != 3 or rgb.shape[2] != 3:
+        raise ValueError(f"Expected RGB (H, W, 3), got shape {rgb.shape}")
+
+    bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+    hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
+
+    bg_mask = cv2.inRange(hsv, HSV_LOWER_MAGENTA, HSV_UPPER_MAGENTA)
+
+    kernel_clean = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+    bg_mask = cv2.morphologyEx(bg_mask, cv2.MORPH_OPEN, kernel_clean)
+
+    fg_mask = cv2.bitwise_not(bg_mask)
+
+    # Despill: where min(R, B) exceeds G by more than threshold, clamp down
+    out = rgb.copy().astype(np.int16)
+    r, g, b = out[:, :, 0], out[:, :, 1], out[:, :, 2]
+    min_rb = np.minimum(r, b)
+    spill = np.maximum(min_rb - g - DESPILL_THRESHOLD, 0)
+    out[:, :, 0] = r - spill
+    out[:, :, 2] = b - spill
+    out = np.clip(out, 0, 255).astype(np.uint8)
+
+    alpha = _feather_alpha(fg_mask, feather_radius)
+
+    return np.dstack([out, alpha])
+
+
 def _feather_alpha(fg_mask: np.ndarray, radius: int) -> np.ndarray:
     """
     Create alpha from foreground mask with inward-only edge feathering.

@@ -85,6 +85,14 @@ ATLAS_PROFILES = {
         "chroma_key": True,
     },
 
+    "locker_hide.png": {
+        "type": "single_chroma",
+        "entity": "player",
+        "frames": ["locker-hide"],
+        "chroma_key": True,
+        "chroma_color": "magenta",
+    },
+
     # ── Monster character (4 atlases, one entity) ─────────────────────────
 
     "monster-base.png": {
@@ -509,11 +517,64 @@ ATLAS_PROFILES = {
         "frames": ["label-throw"],
         "chroma_key": True,
     },
+    "ui-label-tune.png": {
+        "type": "single_chroma",
+        "entity": "ui",
+        "frames": ["label-tune"],
+        "chroma_key": True,
+    },
+    "ui-label-rebuild.png": {
+        "type": "single_chroma",
+        "entity": "ui",
+        "frames": ["label-rebuild"],
+        "chroma_key": True,
+    },
+    "ui-label-whisper.png": {
+        "type": "single_chroma",
+        "entity": "ui",
+        "frames": ["label-whisper"],
+        "chroma_key": True,
+    },
     "ui-mouse-click.png": {
         "type": "single_chroma",
         "entity": "ui",
         "frames": ["mouse-click"],
         "chroma_key": True,
+    },
+
+    # ── Puzzle prop sprites (single chroma-keyed objects) ──────────────
+
+    "broken_tape.png": {
+        "type": "single_chroma",
+        "entity": "puzzle-props",
+        "frames": ["broken_tape"],
+        "chroma_key": True,
+    },
+    "tape_recorder.png": {
+        "type": "single_chroma",
+        "entity": "puzzle-props",
+        "frames": ["tape_recorder"],
+        "chroma_key": True,
+    },
+    "trapdoor_sealed.png": {
+        "type": "single_chroma",
+        "entity": "puzzle-props",
+        "frames": ["trapdoor_sealed"],
+        "chroma_key": True,
+    },
+    "whisper_charm.png": {
+        "type": "single_chroma",
+        "entity": "puzzle-props",
+        "frames": ["whisper_charm"],
+        "chroma_key": True,
+        "chroma_color": "magenta",
+    },
+    "whisper_charm_explainer.png": {
+        "type": "single_chroma",
+        "entity": "puzzle-props",
+        "frames": ["whisper_charm_explainer"],
+        "chroma_key": True,
+        "chroma_color": "magenta",
     },
 
     # ── New full-scene backgrounds ───────────────────────────────────────

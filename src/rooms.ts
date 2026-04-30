@@ -20,14 +20,6 @@ export const ROOM_DEFINITIONS: Record<RoomId, RoomDefinition> = {
     playerSpawnFromRight: 2750,
     pickups: [
       {
-        id: "tape",
-        room: "reception",
-        x: 2100,
-        y: -40,
-        frame: "materials:tape",
-        pickupRange: 100,
-      },
-      {
         id: "tape_01",
         room: "reception",
         x: 2400,
@@ -105,20 +97,21 @@ export const ROOM_DEFINITIONS: Record<RoomId, RoomDefinition> = {
         pickupRange: 100,
       },
       {
-        id: "glass_shards",
-        room: "cubicles",
-        x: 900,
-        y: 0,
-        frame: "materials:glass",
-        pickupRange: 100,
-      },
-      {
         id: "tape_02",
         room: "cubicles",
         x: 2300,
         y: -20,
         frame: "shade-tape:recorder",
         pickupRange: 100,
+      },
+      {
+        id: "broken_tape_01",
+        room: "cubicles",
+        x: 2100,
+        y: -10,
+        frame: "puzzle-props:broken_tape",
+        pickupRange: 100,
+        scale: 0.08,
       },
     ],
     doors: [
@@ -189,20 +182,21 @@ export const ROOM_DEFINITIONS: Record<RoomId, RoomDefinition> = {
         togglesTo: "breaker-on",
       },
       {
-        id: "wire",
-        room: "server",
-        x: 2000,
-        y: 0,
-        frame: "materials:wire",
-        pickupRange: 100,
-      },
-      {
         id: "tape_03",
         room: "server",
         x: 400,
         y: -20,
         frame: "shade-tape:recorder",
         pickupRange: 100,
+      },
+      {
+        id: "broken_tape_02",
+        room: "server",
+        x: 1100,
+        y: -10,
+        frame: "puzzle-props:broken_tape",
+        pickupRange: 100,
+        scale: 0.08,
       },
     ],
     doors: [
@@ -260,6 +254,15 @@ export const ROOM_DEFINITIONS: Record<RoomId, RoomDefinition> = {
     playerSpawnFromRight: 3194,
     pickups: [
       {
+        id: "broken_tape_03",
+        room: "stairwell",
+        x: 1900,
+        y: -10,
+        frame: "puzzle-props:broken_tape",
+        pickupRange: 100,
+        scale: 0.08,
+      },
+      {
         id: "tape_06",
         room: "stairwell",
         x: 2400,
@@ -314,14 +317,6 @@ export const ROOM_DEFINITIONS: Record<RoomId, RoomDefinition> = {
     playerSpawnFromRight: 1900,
     pickups: [
       {
-        id: "battery",
-        room: "archives",
-        x: 1100,
-        y: 0,
-        frame: "materials:battery",
-        pickupRange: 100,
-      },
-      {
         id: "map_fragment",
         room: "archives",
         x: 2000,
@@ -356,7 +351,7 @@ export const ROOM_DEFINITIONS: Record<RoomId, RoomDefinition> = {
       },
     ],
     hidingSpots: [
-      { id: "desk_arch_1", kind: "desk", x: 1500, y: 708, triggerWidth: 80 },
+      { id: "desk_arch_1", kind: "desk", x: 1700, y: 708, triggerWidth: 80 },
     ],
     decorativeProps: [],
     beaconDrainMultiplier: 1.5,

@@ -273,6 +273,12 @@
         "height": 599,
         "baselineY": 598
       },
+      "label-rebuild": {
+        "file": "assets/ui/label-rebuild.png",
+        "width": 1864,
+        "height": 493,
+        "baselineY": 492
+      },
       "label-restart": {
         "file": "assets/ui/label-restart.png",
         "width": 1943,
@@ -284,6 +290,18 @@
         "width": 1965,
         "height": 630,
         "baselineY": 629
+      },
+      "label-tune": {
+        "file": "assets/ui/label-tune.png",
+        "width": 1848,
+        "height": 642,
+        "baselineY": 641
+      },
+      "label-whisper": {
+        "file": "assets/ui/label-whisper.png",
+        "width": 1925,
+        "height": 673,
+        "baselineY": 672
       },
       "mouse-click": {
         "file": "assets/ui/mouse-click.png",
@@ -346,6 +364,45 @@
     "boundingBox": {
       "width": 337,
       "height": 554
+    }
+  },
+  "puzzle-props": {
+    "type": "character",
+    "frames": {
+      "broken_tape": {
+        "file": "assets/puzzle-props/broken_tape.png",
+        "width": 1258,
+        "height": 953,
+        "baselineY": 952
+      },
+      "tape_recorder": {
+        "file": "assets/puzzle-props/tape_recorder.png",
+        "width": 1396,
+        "height": 807,
+        "baselineY": 806
+      },
+      "trapdoor_sealed": {
+        "file": "assets/puzzle-props/trapdoor_sealed.png",
+        "width": 933,
+        "height": 1124,
+        "baselineY": 1123
+      },
+      "whisper_charm": {
+        "file": "assets/puzzle-props/whisper_charm.png",
+        "width": 617,
+        "height": 1104,
+        "baselineY": 1103
+      },
+      "whisper_charm_explainer": {
+        "file": "assets/puzzle-props/whisper_charm_explainer.png",
+        "width": 975,
+        "height": 1381,
+        "baselineY": 1380
+      }
+    },
+    "boundingBox": {
+      "width": 1396,
+      "height": 1381
     }
   },
   "cubicle-dividers": {
@@ -897,258 +954,15 @@
       "height": 269
     }
   },
-  "materials": {
-    "type": "character",
-    "frames": {
-      "wire": {
-        "file": "assets/materials/wire.png",
-        "width": 282,
-        "height": 268,
-        "baselineY": 267,
-        "sourceAtlas": "materials-sheet"
-      },
-      "glass": {
-        "file": "assets/materials/glass.png",
-        "width": 362,
-        "height": 318,
-        "baselineY": 317,
-        "sourceAtlas": "materials-sheet"
-      },
-      "battery": {
-        "file": "assets/materials/battery.png",
-        "width": 362,
-        "height": 353,
-        "baselineY": 352,
-        "sourceAtlas": "materials-sheet"
-      },
-      "tape": {
-        "file": "assets/materials/tape.png",
-        "width": 362,
-        "height": 297,
-        "baselineY": 296,
-        "sourceAtlas": "materials-sheet"
-      },
-      "keycard": {
-        "file": "assets/materials/keycard.png",
-        "width": 330,
-        "height": 281,
-        "baselineY": 280,
-        "sourceAtlas": "materials-sheet"
-      },
-      "fuse": {
-        "file": "assets/materials/fuse.png",
-        "width": 240,
-        "height": 322,
-        "baselineY": 321,
-        "sourceAtlas": "materials-sheet"
-      }
-    },
-    "boundingBox": {
-      "width": 362,
-      "height": 353
-    }
-  },
-  "monster": {
-    "type": "character",
-    "frames": {
-      "alert1": {
-        "file": "assets/monster/alert1.png",
-        "width": 247,
-        "height": 491,
-        "baselineY": 490,
-        "sourceAtlas": "monster-alert"
-      },
-      "alert2": {
-        "file": "assets/monster/alert2.png",
-        "width": 261,
-        "height": 447,
-        "baselineY": 446,
-        "sourceAtlas": "monster-alert"
-      },
-      "hunt1": {
-        "file": "assets/monster/hunt1.png",
-        "width": 386,
-        "height": 343,
-        "baselineY": 342,
-        "sourceAtlas": "monster-alert"
-      },
-      "hunt2": {
-        "file": "assets/monster/hunt2.png",
-        "width": 353,
-        "height": 271,
-        "baselineY": 270,
-        "sourceAtlas": "monster-alert"
-      },
-      "hunt3": {
-        "file": "assets/monster/hunt3.png",
-        "width": 399,
-        "height": 335,
-        "baselineY": 334,
-        "sourceAtlas": "monster-alert"
-      },
-      "hunt4": {
-        "file": "assets/monster/hunt4.png",
-        "width": 369,
-        "height": 262,
-        "baselineY": 261,
-        "sourceAtlas": "monster-alert"
-      },
-      "attack3": {
-        "file": "assets/monster/attack3.png",
-        "width": 621,
-        "height": 514,
-        "baselineY": 513,
-        "sourceAtlas": "monster-attack"
-      },
-      "howl1": {
-        "file": "assets/monster/howl1.png",
-        "width": 286,
-        "height": 636,
-        "baselineY": 635,
-        "sourceAtlas": "monster-attack"
-      },
-      "howl2": {
-        "file": "assets/monster/howl2.png",
-        "width": 583,
-        "height": 647,
-        "baselineY": 646,
-        "sourceAtlas": "monster-attack"
-      },
-      "idle1": {
-        "file": "assets/monster/idle1.png",
-        "width": 266,
-        "height": 556,
-        "baselineY": 555,
-        "sourceAtlas": "monster-base"
-      },
-      "idle2": {
-        "file": "assets/monster/idle2.png",
-        "width": 261,
-        "height": 551,
-        "baselineY": 550,
-        "sourceAtlas": "monster-base"
-      },
-      "walk1": {
-        "file": "assets/monster/walk1.png",
-        "width": 333,
-        "height": 545,
-        "baselineY": 544,
-        "sourceAtlas": "monster-base"
-      },
-      "walk2": {
-        "file": "assets/monster/walk2.png",
-        "width": 294,
-        "height": 547,
-        "baselineY": 546,
-        "sourceAtlas": "monster-base"
-      },
-      "walk3": {
-        "file": "assets/monster/walk3.png",
-        "width": 322,
-        "height": 542,
-        "baselineY": 541,
-        "sourceAtlas": "monster-base"
-      },
-      "walk4": {
-        "file": "assets/monster/walk4.png",
-        "width": 278,
-        "height": 547,
-        "baselineY": 546,
-        "sourceAtlas": "monster-base"
-      },
-      "charge1": {
-        "file": "assets/monster/charge1.png",
-        "width": 362,
-        "height": 230,
-        "baselineY": 229,
-        "sourceAtlas": "monster-charge"
-      },
-      "charge2": {
-        "file": "assets/monster/charge2.png",
-        "width": 249,
-        "height": 206,
-        "baselineY": 205,
-        "sourceAtlas": "monster-charge"
-      },
-      "charge3": {
-        "file": "assets/monster/charge3.png",
-        "width": 349,
-        "height": 238,
-        "baselineY": 237,
-        "sourceAtlas": "monster-charge"
-      },
-      "charge4": {
-        "file": "assets/monster/charge4.png",
-        "width": 343,
-        "height": 216,
-        "baselineY": 215,
-        "sourceAtlas": "monster-charge"
-      },
-      "attack1": {
-        "file": "assets/monster/attack1.png",
-        "width": 311,
-        "height": 374,
-        "baselineY": 373,
-        "sourceAtlas": "monster-charge"
-      },
-      "attack2": {
-        "file": "assets/monster/attack2.png",
-        "width": 383,
-        "height": 344,
-        "baselineY": 343,
-        "sourceAtlas": "monster-charge"
-      },
-      "confused1": {
-        "file": "assets/monster/confused1.png",
-        "width": 261,
-        "height": 587,
-        "baselineY": 586,
-        "sourceAtlas": "monster_confused"
-      },
-      "confused2": {
-        "file": "assets/monster/confused2.png",
-        "width": 325,
-        "height": 497,
-        "baselineY": 496,
-        "sourceAtlas": "monster_confused"
-      },
-      "confused3": {
-        "file": "assets/monster/confused3.png",
-        "width": 337,
-        "height": 374,
-        "baselineY": 373,
-        "sourceAtlas": "monster_confused"
-      },
-      "confused4": {
-        "file": "assets/monster/confused4.png",
-        "width": 390,
-        "height": 232,
-        "baselineY": 231,
-        "sourceAtlas": "monster_confused"
-      },
-      "confused5": {
-        "file": "assets/monster/confused5.png",
-        "width": 319,
-        "height": 562,
-        "baselineY": 561,
-        "sourceAtlas": "monster_confused"
-      },
-      "confused6": {
-        "file": "assets/monster/confused6.png",
-        "width": 318,
-        "height": 422,
-        "baselineY": 421,
-        "sourceAtlas": "monster_confused"
-      }
-    },
-    "boundingBox": {
-      "width": 621,
-      "height": 647
-    }
-  },
   "player": {
     "type": "character",
     "frames": {
+      "locker-hide": {
+        "file": "assets/player/locker-hide.png",
+        "width": 518,
+        "height": 1494,
+        "baselineY": 1493
+      },
       "idle": {
         "file": "assets/player/idle.png",
         "width": 192,
@@ -1494,8 +1308,257 @@
       }
     },
     "boundingBox": {
-      "width": 512,
-      "height": 418
+      "width": 518,
+      "height": 1494
+    }
+  },
+  "materials": {
+    "type": "character",
+    "frames": {
+      "wire": {
+        "file": "assets/materials/wire.png",
+        "width": 282,
+        "height": 268,
+        "baselineY": 267,
+        "sourceAtlas": "materials-sheet"
+      },
+      "glass": {
+        "file": "assets/materials/glass.png",
+        "width": 362,
+        "height": 318,
+        "baselineY": 317,
+        "sourceAtlas": "materials-sheet"
+      },
+      "battery": {
+        "file": "assets/materials/battery.png",
+        "width": 362,
+        "height": 353,
+        "baselineY": 352,
+        "sourceAtlas": "materials-sheet"
+      },
+      "tape": {
+        "file": "assets/materials/tape.png",
+        "width": 362,
+        "height": 297,
+        "baselineY": 296,
+        "sourceAtlas": "materials-sheet"
+      },
+      "keycard": {
+        "file": "assets/materials/keycard.png",
+        "width": 330,
+        "height": 281,
+        "baselineY": 280,
+        "sourceAtlas": "materials-sheet"
+      },
+      "fuse": {
+        "file": "assets/materials/fuse.png",
+        "width": 240,
+        "height": 322,
+        "baselineY": 321,
+        "sourceAtlas": "materials-sheet"
+      }
+    },
+    "boundingBox": {
+      "width": 362,
+      "height": 353
+    }
+  },
+  "monster": {
+    "type": "character",
+    "frames": {
+      "alert1": {
+        "file": "assets/monster/alert1.png",
+        "width": 247,
+        "height": 491,
+        "baselineY": 490,
+        "sourceAtlas": "monster-alert"
+      },
+      "alert2": {
+        "file": "assets/monster/alert2.png",
+        "width": 261,
+        "height": 447,
+        "baselineY": 446,
+        "sourceAtlas": "monster-alert"
+      },
+      "hunt1": {
+        "file": "assets/monster/hunt1.png",
+        "width": 386,
+        "height": 343,
+        "baselineY": 342,
+        "sourceAtlas": "monster-alert"
+      },
+      "hunt2": {
+        "file": "assets/monster/hunt2.png",
+        "width": 353,
+        "height": 271,
+        "baselineY": 270,
+        "sourceAtlas": "monster-alert"
+      },
+      "hunt3": {
+        "file": "assets/monster/hunt3.png",
+        "width": 399,
+        "height": 335,
+        "baselineY": 334,
+        "sourceAtlas": "monster-alert"
+      },
+      "hunt4": {
+        "file": "assets/monster/hunt4.png",
+        "width": 369,
+        "height": 262,
+        "baselineY": 261,
+        "sourceAtlas": "monster-alert"
+      },
+      "attack3": {
+        "file": "assets/monster/attack3.png",
+        "width": 621,
+        "height": 514,
+        "baselineY": 513,
+        "sourceAtlas": "monster-attack"
+      },
+      "howl1": {
+        "file": "assets/monster/howl1.png",
+        "width": 286,
+        "height": 636,
+        "baselineY": 635,
+        "sourceAtlas": "monster-attack"
+      },
+      "howl2": {
+        "file": "assets/monster/howl2.png",
+        "width": 583,
+        "height": 647,
+        "baselineY": 646,
+        "sourceAtlas": "monster-attack"
+      },
+      "idle1": {
+        "file": "assets/monster/idle1.png",
+        "width": 266,
+        "height": 556,
+        "baselineY": 555,
+        "sourceAtlas": "monster-base"
+      },
+      "idle2": {
+        "file": "assets/monster/idle2.png",
+        "width": 261,
+        "height": 551,
+        "baselineY": 550,
+        "sourceAtlas": "monster-base"
+      },
+      "walk1": {
+        "file": "assets/monster/walk1.png",
+        "width": 333,
+        "height": 545,
+        "baselineY": 544,
+        "sourceAtlas": "monster-base"
+      },
+      "walk2": {
+        "file": "assets/monster/walk2.png",
+        "width": 294,
+        "height": 547,
+        "baselineY": 546,
+        "sourceAtlas": "monster-base"
+      },
+      "walk3": {
+        "file": "assets/monster/walk3.png",
+        "width": 322,
+        "height": 542,
+        "baselineY": 541,
+        "sourceAtlas": "monster-base"
+      },
+      "walk4": {
+        "file": "assets/monster/walk4.png",
+        "width": 278,
+        "height": 547,
+        "baselineY": 546,
+        "sourceAtlas": "monster-base"
+      },
+      "charge1": {
+        "file": "assets/monster/charge1.png",
+        "width": 362,
+        "height": 230,
+        "baselineY": 229,
+        "sourceAtlas": "monster-charge"
+      },
+      "charge2": {
+        "file": "assets/monster/charge2.png",
+        "width": 249,
+        "height": 206,
+        "baselineY": 205,
+        "sourceAtlas": "monster-charge"
+      },
+      "charge3": {
+        "file": "assets/monster/charge3.png",
+        "width": 349,
+        "height": 238,
+        "baselineY": 237,
+        "sourceAtlas": "monster-charge"
+      },
+      "charge4": {
+        "file": "assets/monster/charge4.png",
+        "width": 343,
+        "height": 216,
+        "baselineY": 215,
+        "sourceAtlas": "monster-charge"
+      },
+      "attack1": {
+        "file": "assets/monster/attack1.png",
+        "width": 311,
+        "height": 374,
+        "baselineY": 373,
+        "sourceAtlas": "monster-charge"
+      },
+      "attack2": {
+        "file": "assets/monster/attack2.png",
+        "width": 383,
+        "height": 344,
+        "baselineY": 343,
+        "sourceAtlas": "monster-charge"
+      },
+      "confused1": {
+        "file": "assets/monster/confused1.png",
+        "width": 261,
+        "height": 587,
+        "baselineY": 586,
+        "sourceAtlas": "monster_confused"
+      },
+      "confused2": {
+        "file": "assets/monster/confused2.png",
+        "width": 325,
+        "height": 497,
+        "baselineY": 496,
+        "sourceAtlas": "monster_confused"
+      },
+      "confused3": {
+        "file": "assets/monster/confused3.png",
+        "width": 337,
+        "height": 374,
+        "baselineY": 373,
+        "sourceAtlas": "monster_confused"
+      },
+      "confused4": {
+        "file": "assets/monster/confused4.png",
+        "width": 390,
+        "height": 232,
+        "baselineY": 231,
+        "sourceAtlas": "monster_confused"
+      },
+      "confused5": {
+        "file": "assets/monster/confused5.png",
+        "width": 319,
+        "height": 562,
+        "baselineY": 561,
+        "sourceAtlas": "monster_confused"
+      },
+      "confused6": {
+        "file": "assets/monster/confused6.png",
+        "width": 318,
+        "height": 422,
+        "baselineY": 421,
+        "sourceAtlas": "monster_confused"
+      }
+    },
+    "boundingBox": {
+      "width": 621,
+      "height": 647
     }
   },
   "shade-tape": {
